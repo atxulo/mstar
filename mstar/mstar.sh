@@ -116,13 +116,13 @@ fi
 cat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.htm | gawk 'match( $0, /snapshot\.aspx\?id=([A-Za-z0-9]*)">([^<]*).*title="([^"/]*)\/([^/]*)\/([^"]*)[^>]*>([^<]*)/, grupos) { print grupos[1] ";" grupos[2] ";" grupos[5] grupos[4] grupos[3] ";" grupos[3] "/" grupos[4] "/" grupos[5] ";" grupos[6]}' > $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat.tmp 
 
 # Juntamos el fichero temporal con el dat, ordenando alfabeticamente
-sort -r -m -u $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat.tmp -o $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat
+cat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat.tmp| sort -r -u -o $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat
 
 # Copiamos el fichero dat como csv
 cp $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.csv
 
 # Partimos el fichero dat en varios ficheros csv, uno por ID, usando como nombre ID-Nombre
-gawk -F ";" -v OUT="$CARPETA_OUT/" '{close(f);c=gensub("[^[:alnum:]]", "_", "g", $2);f=$1"-"c}{print >> OUT f ".csv"}' $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat
+gawk -F ";" -v OUT="$CARPETA_OUT/" '{close(f);c=gensub("[^[:alnum:]]", "_", "g", $2);f=$1"-"c}{print > OUT f ".csv"}' $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat
 
 # Borramos los ficheros temporales generados
 rm $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.htm
