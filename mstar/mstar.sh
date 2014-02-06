@@ -100,26 +100,26 @@ if [[ ! -d "${CARPETA_OUT}" ]]; then
 fi
 
 # Creamos el fichero dat si no existe
-if [ ! -f $CARPETA_OUT/mstar_portfolio.dat ]; then
-  > $CARPETA_OUT/mstar_portfolio.dat
-  mensaje "Creado fichero $CARPETA_OUT/mstar_portfolio.dat"
+if [ ! -f $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat ]; then
+  > $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat
+  mensaje "Creado fichero $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat"
 fi
 
 # Nos conectamos a la pagina para extraer los datos de la cartera
-wget --load-cookies $FICHERO_COOKIES --output-document=$CARPETA_OUT/mstar_portfolio.htm "http://www.morningstar.es/es/portfoliomanager/portfolio.aspx?Portfolio_ID=$PORTFOLIO_ID"
+# wget --load-cookies $FICHERO_COOKIES --output-document=$CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.htm "http://www.morningstar.es/es/portfoliomanager/portfolio.aspx?Portfolio_ID=$PORTFOLIO_ID"
 
 # Leemos el fichero descargado y lo convertimos en un fichero con este formato: "ID;Nombre;AAAAMMDD;Fecha;VL"
-cat $CARPETA_OUT/mstar_portfolio.htm | gawk 'match( $0, /snapshot\.aspx\?id=([A-Za-z0-9]*)">([^<]*).*title="([^"/]*)\/([^/]*)\/([^"]*)[^>]*>([^<]*)/, grupos) { print grupos[1] ";" grupos[2] ";" grupos[5] grupos[4] grupos[3] ";" grupos[3] "/" grupos[4] "/" grupos[5] ";" grupos[6]}' > $CARPETA_OUT/mstar_portfolio.dat.tmp 
+cat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.htm | gawk 'match( $0, /snapshot\.aspx\?id=([A-Za-z0-9]*)">([^<]*).*title="([^"/]*)\/([^/]*)\/([^"]*)[^>]*>([^<]*)/, grupos) { print grupos[1] ";" grupos[2] ";" grupos[5] grupos[4] grupos[3] ";" grupos[3] "/" grupos[4] "/" grupos[5] ";" grupos[6]}' > $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat.tmp 
 
 # Juntamos el fichero temporal con el dat, ordenando alfabeticamente
-sort -r -m -u $CARPETA_OUT/mstar_portfolio.dat $CARPETA_OUT/mstar_portfolio.dat.tmp -o $CARPETA_OUT/mstar_portfolio.dat
+sort -r -m -u $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat.tmp -o $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat
 
 # Copiamos el fichero dat como csv
-cp $CARPETA_OUT/mstar_portfolio.dat $CARPETA_OUT/mstar_portfolio.csv
+cp $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.csv
 
 # Partimos el fichero dat en varios ficheros csv, uno por ID, usando como nombre ID-Nombre
-gawk -F ";" -v OUT="$CARPETA_OUT/" '{close(f);f=$1"-"$2}{print >> OUT f ".csv"}' $CARPETA_OUT/mstar_portfolio.dat
+gawk -F ";" -v OUT="$CARPETA_OUT/" '{close(f);c=gensub("[^[:alnum:]]", "_", "g", $2);f=$1"-"c}{print >> OUT f ".csv"}' $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat
 
 # Borramos los ficheros temporales generados
-rm $CARPETA_OUT/mstar_portfolio.htm
-rm $CARPETA_OUT/mstar_portfolio.dat.tmp
+rm $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.htm
+rm $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat.tmp
