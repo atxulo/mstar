@@ -99,10 +99,14 @@ if [[ ! -d "${CARPETA_OUT}" ]]; then
 	mensaje "Carpeta $CARPETA_OUT creada"
 fi
 
-# Creamos el fichero dat si no existe
+# Creamos los ficheros dat si no existen
 if [ ! -f $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat ]; then
   > $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat
   mensaje "Creado fichero $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat"
+fi
+if [ ! -f $CARPETA_OUT/mstar_isin_$PORTFOLIO_ID.dat ]; then
+  echo "# ID_MSTAR = ISIN" > $CARPETA_OUT/mstar_isin_$PORTFOLIO_ID.dat
+  mensaje "Creado fichero $CARPETA_OUT/mstar_isin_$PORTFOLIO_ID.dat"
 fi
 
 # Nos conectamos a la pagina para extraer los datos de la cartera
@@ -115,8 +119,27 @@ fi
 # Leemos el fichero descargado y lo convertimos en un fichero con este formato: "ID;Nombre;AAAAMMDD;Fecha;VL"
 cat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.htm | gawk 'match( $0, /snapshot\.aspx\?id=([A-Za-z0-9]*)">([^<]*).*title="([^"/]*)\/([^/]*)\/([^"]*)[^>]*>([^<]*)/, grupos) { print grupos[1] ";" grupos[2] ";" grupos[5] grupos[4] grupos[3] ";" grupos[3] "/" grupos[4] "/" grupos[5] ";" grupos[6]}' > $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat.tmp 
 
-# Juntamos el fichero temporal con el dat, ordenando alfabeticamente
-cat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat.tmp| sort -r -u -o $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat
+# Leemos el fichero temporal descargado
+while read linea_dat_tmp; do
+	mstar_id=${linea_dat_tmp%%;*}
+	
+	# Leemos el ISIN del fichero o de MStar si no lo tenemos
+	isin_dat=$(grep "$mstar_id=" "$CARPETA_OUT/mstar_isin_$PORTFOLIO_ID.dat")
+	if [ $? -eq 0 ]; then
+		# Nos quedamos con la parte derecha de la linea del fichero de configuracion
+		isin=${isin_dat#*=} 
+	else
+		isin=$(wget -O- http://www.morningstar.es/es/funds/snapshot/snapshot.aspx?id=$mstar_id | sed -n -e 's/.*heading\">ISIN<\/td>.*text">\([^<]*\).*VL.*/\1/p')
+		echo "$mstar_id=$isin" >> $CARPETA_OUT/mstar_isin_$PORTFOLIO_ID.dat
+	fi
+
+	echo ${linea_dat_tmp//$mstar_id/$isin} 
+	
+	# Guardamos la linea modificada en el fichero
+done <$CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat.tmp > $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat.tmp.2; mv $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat.tmp{.2,}
+
+# Juntamos el fichero temporal con el dat, ordenando alfabeticamente (asc) y por fecha (desc)
+cat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat.tmp | sort -u -t\; -k2,2 -k3,3r -o $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat
 
 # Copiamos el fichero dat como csv
 cp $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.csv
