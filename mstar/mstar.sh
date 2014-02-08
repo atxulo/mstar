@@ -144,8 +144,10 @@ cat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat $CARPETA_OUT/mstar_portfolio_
 # Copiamos el fichero dat como csv
 cp $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.csv
 
-# Partimos el fichero dat en varios ficheros csv, uno por ID, usando como nombre ID-Nombre
-gawk -F ";" -v OUT="$CARPETA_OUT/" '{close(f);c=gensub("[^[:alnum:]]", "_", "g", $2);f=$1"-"c}{print > OUT f ".csv"}' $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat
+if [[ "$GENERAR_FICHEROS_INDIVIDUALES" = true ]]; then
+  # Partimos el fichero dat en varios ficheros csv, uno por ID, usando como nombre ID-Nombre
+  gawk -F ";" -v OUT="$CARPETA_OUT/" '{close(f);c=gensub("[^[:alnum:]]", "_", "g", $2);f=$1"-"c}{print > OUT f ".csv"}' $CARPETA_OUT/mstar_portfolio_$PORTFO$
+fi
 
 # Borramos los ficheros temporales generados
 rm $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.htm
