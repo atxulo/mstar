@@ -6,5 +6,5 @@
 @set CYGWIN_BIN="c:\cygwin64\bin"
 @set PATH=%CYGWIN_BIN%;%PATH%
 
-%CYGWIN_BIN%\bash mstar.sh 123456
+%CYGWIN_BIN%\bash mstar.sh -i -o salida 123456
 @pause
