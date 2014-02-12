@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Autor: Eneko Gonzalez
-# Version: 1.0
+# Version: 1.0-beta1
 #
 # Script para generar uno o varios ficheros CSV a partir de una cartera de la pagina Morningstar.es
 
