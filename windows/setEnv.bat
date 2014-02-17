@@ -9,3 +9,6 @@
 
 @REM Ruta de instalacion del script mstar
 @set MSTAR="c:\mstar"
+
+@REM Ruta de salida de los scripts
+@set MSTAR_SALIDA="c:\mstar\salida"
