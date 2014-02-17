@@ -1,7 +1,6 @@
 #!/bin/bash
 #
 # Autor: Eneko Gonzalez
-# Version: 1.0-beta2
 #
 # Script para limpiar el fichero de cookies, eliminando las que no son necesarias
 
