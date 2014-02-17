@@ -1,7 +1,6 @@
 #!/bin/bash
 #
 # Autor: Eneko Gonzalez
-# Version: 1.0-beta2
 #
 # Script para generar un fichero CSV con datos inventados, para probar las plantillas con volumen de datos
 #
