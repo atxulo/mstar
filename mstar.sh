@@ -6,8 +6,8 @@
 
 # Parametros que se leen de la linea de comandos con sus valores por defecto
 FICHERO_COOKIES="cookies.txt"
-GENERAR_FICHEROS_INDIVIDUALES=true
 CARPETA_OUT="out"
+CARTERA_RAPIDA=false
 VERBOSE=false
 PORTFOLIO_ID=
 
@@ -25,27 +25,27 @@ USO: $0 opciones portfolio_id
 OPCIONES:
    -c [fichero]    Path del fichero con la cookie de morningstar.es. Por defecto $FICHERO_COOKIES
    -h              Muestra este mensaje de ayuda y finaliza
-   -i              No generar los ficheros individuales (uno por cada fondo), solo genera un fichero CSV
    -o [ruta]       Path de la carpeta donde dejar los ficheros resultado. Si no existe, la intenta crear
+   -r              Indica que la cartera MStar es de tipo rapida. Si no se indica, se supone transaccional
    -v              Modo verbose para depurar los pasos ejecutados
 
 EJEMPLOS:
   $0 2176038  
       
-	  Genera los ficheros individuales para la cartera '2176038' en la carpeta '$CARPETA_OUT' usando el fichero de cookies '$FICHERO_COOKIES'
+	  Genera el fichero para la cartera '2176038' en la carpeta '$CARPETA_OUT' usando el fichero de cookies '$FICHERO_COOKIES'
 	  
   $0 -o salida 2176038  
       
-	  Genera los ficheros individuales para la cartera '2176038' en la carpeta 'salida' usando el fichero de cookies '$FICHERO_COOKIES'
+	  Genera el fichero para la cartera '2176038' en la carpeta 'salida' usando el fichero de cookies '$FICHERO_COOKIES'
 	  
   $0 -o salida -c mis_cookies.txt 2176038 
       
-	  Genera los ficheros individuales para la cartera '2176038' en la carpeta 'salida' usando el fichero de cookies 'mis_cookies.txt'
+	  Genera el fichero para la cartera '2176038' en la carpeta 'salida' usando el fichero de cookies 'mis_cookies.txt'
 EOF
 }
 
 # Leemos los parametros del script
-while getopts "c:hio:v" opt; do
+while getopts "c:ho:rv" opt; do
   case $opt in
     c)
       FICHERO_COOKIES=$OPTARG
@@ -54,12 +54,12 @@ while getopts "c:hio:v" opt; do
       usage
       exit 1
       ;;
-    i)
-      GENERAR_FICHEROS_INDIVIDUALES=false
-      ;;
     o)
       CARPETA_OUT=$OPTARG
       ;;
+    r)
+      CARTERA_RAPIDA=true
+      ;;	  
     v)
       VERBOSE=true
       ;;
@@ -114,9 +114,18 @@ if [ $? -ne 0 ]; then
   echo "Error al descargar el portfolio de http://www.morningstar.es/es/portfoliomanager/portfolio.aspx?Portfolio_ID=$PORTFOLIO_ID, abortando"
   exit $?
 fi
+#if [[ "$CARTERA_RAPIDA" = true ]]; then 
+#  cp cartera_rapida.html $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.htm
+#else
+#  cp cartera_transaccional.html $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.htm
+#fi
 
-# Leemos el fichero descargado y lo convertimos en un fichero con este formato: "ID;Nombre;AAAAMMDD;Fecha;VL"
-cat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.htm | gawk 'match( $0, /snapshot\.aspx\?id=([A-Za-z0-9]*)">([^<]*).*title="([^"/]*)\/([^/]*)\/([^"]*)[^>]*>([^<]*)/, grupos) { print grupos[1] ";" grupos[2] ";" grupos[5] grupos[4] grupos[3] ";" grupos[3] "/" grupos[4] "/" grupos[5] ";" grupos[6]}' > $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat.tmp 
+# Leemos el fichero descargado y lo convertimos en un fichero con este formato: "ID;Nombre;AAAAMMDD;Fecha;VL;MONEDA"
+if [[ "$CARTERA_RAPIDA" = true ]]; then 
+  cat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.htm | gawk 'match( $0, /snapshot\.aspx\?id=([A-Za-z0-9]*)">([^<]*).*title="([^"/]*)\/([^/]*)\/([^"]*)[^>]*>([^<]*)<.*msDataText[^>]*>([^<]*)/, grupos) { print grupos[1] ";" grupos[2] ";" grupos[5] grupos[4] grupos[3] ";" grupos[3] "/" grupos[4] "/" grupos[5] ";" grupos[6] ";" grupos[7]}' > $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat.tmp  
+else
+  cat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.htm | gawk 'match( $0, /snapshot\.aspx\?id=([A-Za-z0-9]*)">([^<]*).*title="([^"/]*)\/([^/]*)\/([^"]*)[^>]*>([^<]*)/, grupos) { print grupos[1] ";" grupos[2] ";" grupos[5] grupos[4] grupos[3] ";" grupos[3] "/" grupos[4] "/" grupos[5] ";" grupos[6] ";EUR"}' > $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat.tmp 
+fi
 
 # Leemos el fichero temporal descargado
 while read linea_dat_tmp; do
@@ -131,7 +140,55 @@ while read linea_dat_tmp; do
 		isin=$(wget -O- http://www.morningstar.es/es/funds/snapshot/snapshot.aspx?id=$mstar_id | sed -n -e 's/.*heading\">ISIN<\/td>.*text">\([^<]*\).*VL.*/\1/p')
 		echo "$mstar_id=$isin" >> $CARPETA_OUT/mstar_isin_$PORTFOLIO_ID.dat
 	fi
-
+	
+	# Miramos la moneda del VL (nos quedamos con lo que esta a la derecha del ultimo ;)
+    moneda=${linea_dat_tmp##*\;}
+	# Quitamos la moneda y obtenemos el ultimo valor, el VL en esa Moneda
+	linea_dat_tmp=${linea_dat_tmp%\;*}
+	vlMoneda=${linea_dat_tmp##*\;}
+	# Quitamos el punto de separador de miles, y cambiamos la coma decimal por punto
+	vlMonedaPunto=${vlMoneda//./}
+    vlMonedaPunto=${vlMonedaPunto//,/.}
+	# Quitamos el VL y obtenemos la fecha, y cambiamos las / por -
+	linea_dat_tmp=${linea_dat_tmp%\;*}
+	fechaVL=${linea_dat_tmp##*\;}
+	fechaVLGuion=${fechaVL//\//-}
+	
+	if [[ "$moneda" = "EUR" ]]; then 
+      # Como ya esta en euros, el cambio es 1
+	  cambioVL="1"
+	elif [[ "$moneda" = "USD" ]]; then
+	  # Descargamos el cambio euro-dolar del dia del vl
+	  wget --output-document=$CARPETA_OUT/mstar_euro_dolar.htm.tmp "http://sdw.ecb.europa.eu/quickview.do?SERIES_KEY=120.EXR.D.USD.EUR.SP00.A&start=${fechaVLGuion}&end=${fechaVLGuion}&ubmitOptions.x=55&submitOptions.y=4&trans=N"
+      if [ $? -ne 0 ]; then
+        echo "Error al descargar la informacion de 'http://sdw.ecb.europa.eu/quickview.do?SERIES_KEY=120.EXR.D.USD.EUR.SP00.A&start=${fechaVLGuion}$end=${fechaVLGuion}&ubmitOptions.x=55&submitOptions.y=4&trans=N', abortando"
+		rm $CARPETA_OUT/mstar_euro_dolar.htm.tmp
+        exit $?
+      fi
+	  # Leemos el fichero descargado y lo obtenemos el valor
+      # Elimina las lineas anteriores a "tablestats"
+      # Elimina las posteriores a /table
+      # Elimina las que no tengan 8%
+      # Extrae el valor (#.####)
+      # Elimina las lineas que no han podido ser formateada y aun tienen el 8%
+	  cambioVL=$(cat $CARPETA_OUT/mstar_euro_dolar.htm.tmp | sed -e '1,/table class=\"tablestats\">/d' -e '/\/table/,$ d' -e '/8%/ !d' -e 's/.*8%[^>]*>[0-9]*-[0-9]*-[0-9]*<\/td\>.*right\;\">\([0-9]*\)\.\([0-9]*\).*/\1.\2/' -e '/8%/ d')
+	  rm $CARPETA_OUT/mstar_euro_dolar.htm.tmp
+	else
+      # No sabemos que moneda es
+	  cambioVL="ERROR"
+	fi
+	
+    # Hacemos el cambio y escribimos de nuevo los campos
+	if [[ "$cambioVL" = "ERROR" ]]; then 
+      vlEurosComa=0
+	  cambioVLComa=0
+	else
+      vlEuros=$(gawk "BEGIN {printf  \"%f\",($vlMonedaPunto/$cambioVL)}")
+	  vlEurosComa=${vlEuros//./,}
+	  cambioVLComa=${cambioVL//./,}
+	fi
+	
+    linea_dat_tmp=${linea_dat_tmp}";$vlMoneda;$moneda;$cambioVLComa;$vlEurosComa"
 	echo ${linea_dat_tmp//$mstar_id/$isin} 
 	
 	# Guardamos la linea modificada en el fichero
@@ -143,11 +200,6 @@ cat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat $CARPETA_OUT/mstar_portfolio_
 # Copiamos el fichero dat como csv y eliminamos las fechas AAAAMMDD que solo necesitabamos para ordenar
 cp $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.csv
 sed -i -e 's/\;[0-9]*\;/\;/1' $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.csv
-
-if [[ "$GENERAR_FICHEROS_INDIVIDUALES" = true ]]; then
-  # Partimos el fichero dat en varios ficheros csv, uno por ID, usando como nombre ID-Nombre
-  gawk -F ";" -v OUT="$CARPETA_OUT/" '{close(f);c=gensub("[^[:alnum:]]", "_", "g", $2);f=$1"-"c}{print > OUT f ".csv"}' $CARPETA_OUT/mstar_portfolio_$PORTFO$
-fi
 
 # Borramos los ficheros temporales generados
 rm $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.htm
