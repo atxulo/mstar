@@ -114,6 +114,7 @@ if [ $? -ne 0 ]; then
   echo "Error al descargar el portfolio de http://www.morningstar.es/es/portfoliomanager/portfolio.aspx?Portfolio_ID=$PORTFOLIO_ID, abortando"
   exit $?
 fi
+# Usado para pruebas sin conexion https a Mstar
 #if [[ "$CARTERA_RAPIDA" = true ]]; then 
 #  cp cartera_rapida.html $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.htm
 #else
@@ -136,36 +137,44 @@ while read linea_dat_tmp; do
 	if [ $? -eq 0 ]; then
 		# Nos quedamos con la parte derecha de la linea del fichero de configuracion
 		isin=${isin_dat#*=} 
+		if [ -z "$isin" ]; then
+          echo "Error al obtener el ISIN '$isin' del fichero '$CARPETA_OUT/mstar_isin_$PORTFOLIO_ID.dat', abortando" 1>&2
+		  exit 1
+		fi
 	else
-		isin=$(wget -O- http://www.morningstar.es/es/funds/snapshot/snapshot.aspx?id=$mstar_id | sed -n -e 's/.*heading\">ISIN<\/td>.*text">\([^<]*\).*VL.*/\1/p')
+		isin=$(wget -O- http://www.morningstar.es/es/funds/snapshot/snapshot.aspx?id=$mstar_id | sed -n -e 's/.*heading\">ISIN<\/td>.*text">\([^<]*\).*Patrimonio (.*/\1/p')
+		if [ ! $? -eq 0 ] || [ -z "$isin" ]; then
+		  echo "Error al obtener el ISIN '$isin' de 'http://www.morningstar.es/es/funds/snapshot/snapshot.aspx?id=$mstar_id', abortando" 1>&2
+          exit 1
+		fi
 		echo "$mstar_id=$isin" >> $CARPETA_OUT/mstar_isin_$PORTFOLIO_ID.dat
 	fi
 	
 	# Miramos la moneda del VL (nos quedamos con lo que esta a la derecha del ultimo ;)
-    moneda=${linea_dat_tmp##*\;}
+  moneda=${linea_dat_tmp##*\;}
 	# Quitamos la moneda y obtenemos el ultimo valor, el VL en esa Moneda
 	linea_dat_tmp=${linea_dat_tmp%\;*}
 	vlMoneda=${linea_dat_tmp##*\;}
 	# Quitamos el punto de separador de miles, y cambiamos la coma decimal por punto
 	vlMonedaPunto=${vlMoneda//./}
-    vlMonedaPunto=${vlMonedaPunto//,/.}
+  vlMonedaPunto=${vlMonedaPunto//,/.}
 	# Quitamos el VL y obtenemos la fecha, y cambiamos las / por -
 	linea_dat_tmp=${linea_dat_tmp%\;*}
 	fechaVL=${linea_dat_tmp##*\;}
 	fechaVLGuion=${fechaVL//\//-}
 	
 	if [[ "$moneda" = "EUR" ]]; then 
-      # Como ya esta en euros, el cambio es 1
+    # Como ya esta en euros, el cambio es 1
 	  cambioVL="1"
 	elif [[ "$moneda" = "USD" ]]; then
 	  # Descargamos el cambio euro-dolar del dia del vl
 	  wget --output-document=$CARPETA_OUT/mstar_euro_dolar.htm.tmp "http://sdw.ecb.europa.eu/quickview.do?SERIES_KEY=120.EXR.D.USD.EUR.SP00.A&start=${fechaVLGuion}&end=${fechaVLGuion}&ubmitOptions.x=55&submitOptions.y=4&trans=N"
       if [ $? -ne 0 ]; then
         echo "Error al descargar la informacion de 'http://sdw.ecb.europa.eu/quickview.do?SERIES_KEY=120.EXR.D.USD.EUR.SP00.A&start=${fechaVLGuion}$end=${fechaVLGuion}&ubmitOptions.x=55&submitOptions.y=4&trans=N', abortando"
-		rm $CARPETA_OUT/mstar_euro_dolar.htm.tmp
+		    rm $CARPETA_OUT/mstar_euro_dolar.htm.tmp
         exit $?
       fi
-	  # Leemos el fichero descargado y lo obtenemos el valor
+	    # Leemos el fichero descargado y lo obtenemos el valor
       # Elimina las lineas anteriores a "tablestats"
       # Elimina las posteriores a /table
       # Elimina las que no tengan 8%
