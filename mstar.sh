@@ -204,7 +204,7 @@ while read linea_dat_tmp; do
 done <$CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat.tmp > $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat.tmp.2; mv $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat.tmp{.2,}
 
 # Juntamos el fichero temporal con el dat, ordenando alfabeticamente (asc) y por fecha (desc)
-cat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat.tmp | sort -u -t\; -k2,2 -k3,3r -o $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat
+cat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat.tmp | sort -u -t\; -k2,2d -k3,3r -o $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat
 
 # Copiamos el fichero dat como csv y eliminamos las fechas AAAAMMDD que solo necesitabamos para ordenar
 cp $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.csv
