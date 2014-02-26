@@ -3,15 +3,25 @@
 # Autor: Eneko Gonzalez
 #
 # Script para generar uno o varios ficheros CSV a partir de una cartera de la pagina Morningstar.es
+AHORA=$(date +"%Y%m%d_%H%M%S_%N")
 
 # Parametros que se leen de la linea de comandos con sus valores por defecto
+CARPETA_BACKUP=
 FICHERO_COOKIES="cookies.txt"
 CARPETA_OUT="out"
 CARTERA_RAPIDA=false
 VERBOSE=false
 PORTFOLIO_ID=
 
+# Funcion para copiar un fichero en una ruta de backup
+# $1 ruta del fichero del que hacer backup
+backupFichero() {
+	nombreFichero="${1##*/}"
+	cp $1 $CARPETA_BACKUP"/"$AHORA"_"$nombreFichero".bak"
+}
+
 # Funcion para escribir los mensajes en modo verbose
+# $1 mensaje a escribir
 mensaje() {
 	if [[ "$VERBOSE" = true ]]; then echo $1; fi
 }
@@ -23,6 +33,7 @@ cat << EOF
 USO: $0 opciones portfolio_id
 
 OPCIONES:
+   -b [ruta]       Path de la carpeta donde dejar una copia de seguridad de los ficheros. Si no se indica, no se hace copia.
    -c [fichero]    Path del fichero con la cookie de morningstar.es. Por defecto $FICHERO_COOKIES
    -h              Muestra este mensaje de ayuda y finaliza
    -o [ruta]       Path de la carpeta donde dejar los ficheros resultado. Si no existe, la intenta crear
@@ -45,8 +56,11 @@ EOF
 }
 
 # Leemos los parametros del script
-while getopts "c:ho:rv" opt; do
+while getopts "b:c:ho:rv" opt; do
   case $opt in
+    b)
+      CARPETA_BACKUP=$OPTARG
+	  ;;
     c)
       FICHERO_COOKIES=$OPTARG
 	  ;;
@@ -98,14 +112,30 @@ if [[ ! -d "${CARPETA_OUT}" ]]; then
 	mensaje "Carpeta $CARPETA_OUT creada"
 fi
 
-# Creamos los ficheros dat si no existen
+# Si se ha indicado, intentamos crear la carpeta de backup
+if [ ! -z "$CARPETA_BACKUP" ]; then
+	if [[ ! -d "${CARPETA_BACKUP}" ]]; then
+		mkdir "$CARPETA_BACKUP"
+	fi
+fi
+
+# Creamos los ficheros dat si no existen, y si existen, hacemos backup si asi se ha indicado
 if [ ! -f $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat ]; then
   > $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat
   mensaje "Creado fichero $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat"
+else
+  if [ ! -z "$CARPETA_BACKUP" ]; then
+    backupFichero "$CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat"
+  fi
 fi
+
 if [ ! -f $CARPETA_OUT/mstar_isin_$PORTFOLIO_ID.dat ]; then
   echo "# ID_MSTAR = ISIN" > $CARPETA_OUT/mstar_isin_$PORTFOLIO_ID.dat
   mensaje "Creado fichero $CARPETA_OUT/mstar_isin_$PORTFOLIO_ID.dat"
+else
+  if [ ! -z "$CARPETA_BACKUP" ]; then
+    backupFichero "$CARPETA_OUT/mstar_isin_$PORTFOLIO_ID.dat"
+  fi
 fi
 
 # Nos conectamos a la pagina para extraer los datos de la cartera
@@ -151,30 +181,30 @@ while read linea_dat_tmp; do
 	fi
 	
 	# Miramos la moneda del VL (nos quedamos con lo que esta a la derecha del ultimo ;)
-  moneda=${linea_dat_tmp##*\;}
+    moneda=${linea_dat_tmp##*\;}
 	# Quitamos la moneda y obtenemos el ultimo valor, el VL en esa Moneda
 	linea_dat_tmp=${linea_dat_tmp%\;*}
 	vlMoneda=${linea_dat_tmp##*\;}
 	# Quitamos el punto de separador de miles, y cambiamos la coma decimal por punto
 	vlMonedaPunto=${vlMoneda//./}
-  vlMonedaPunto=${vlMonedaPunto//,/.}
+    vlMonedaPunto=${vlMonedaPunto//,/.}
 	# Quitamos el VL y obtenemos la fecha, y cambiamos las / por -
 	linea_dat_tmp=${linea_dat_tmp%\;*}
 	fechaVL=${linea_dat_tmp##*\;}
 	fechaVLGuion=${fechaVL//\//-}
 	
 	if [[ "$moneda" = "EUR" ]]; then 
-    # Como ya esta en euros, el cambio es 1
+      # Como ya esta en euros, el cambio es 1
 	  cambioVL="1"
 	elif [[ "$moneda" = "USD" ]]; then
 	  # Descargamos el cambio euro-dolar del dia del vl
 	  wget --output-document=$CARPETA_OUT/mstar_euro_dolar.htm.tmp "http://sdw.ecb.europa.eu/quickview.do?SERIES_KEY=120.EXR.D.USD.EUR.SP00.A&start=${fechaVLGuion}&end=${fechaVLGuion}&ubmitOptions.x=55&submitOptions.y=4&trans=N"
       if [ $? -ne 0 ]; then
         echo "Error al descargar la informacion de 'http://sdw.ecb.europa.eu/quickview.do?SERIES_KEY=120.EXR.D.USD.EUR.SP00.A&start=${fechaVLGuion}$end=${fechaVLGuion}&ubmitOptions.x=55&submitOptions.y=4&trans=N', abortando"
-		    rm $CARPETA_OUT/mstar_euro_dolar.htm.tmp
+		rm $CARPETA_OUT/mstar_euro_dolar.htm.tmp
         exit $?
       fi
-	    # Leemos el fichero descargado y lo obtenemos el valor
+	  # Leemos el fichero descargado y lo obtenemos el valor
       # Elimina las lineas anteriores a "tablestats"
       # Elimina las posteriores a /table
       # Elimina las que no tengan 8%
@@ -204,11 +234,17 @@ while read linea_dat_tmp; do
 done <$CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat.tmp > $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat.tmp.2; mv $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat.tmp{.2,}
 
 # Juntamos el fichero temporal con el dat, ordenando alfabeticamente (asc) y por fecha (desc)
-cat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat.tmp | sort -u -t\; -k2,2d -k3,3r -o $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat
+cat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat.tmp | sort -u -t\; -k3,3r -k2,2 -o $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat
 
-# Copiamos el fichero dat como csv y eliminamos las fechas AAAAMMDD que solo necesitabamos para ordenar
-cp $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.csv
-sed -i -e 's/\;[0-9]*\;/\;/1' $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.csv
+# Si ya existe el CSV, hacemos el backup si asi se ha indicado 
+if [[ -f "${CARPETA_OUT}/mstar_portfolio_$PORTFOLIO_ID.csv" ]]; then
+  if [ ! -z "$CARPETA_BACKUP" ]; then
+    backupFichero "$CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.csv"
+  fi
+fi
+
+# Copiamos el fichero dat como csv y eliminamos el nombre y fechas AAAAMMDD que solo necesitabamos para ordenar
+cut -d\; -f1,4- $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat > $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.csv
 
 # Borramos los ficheros temporales generados
 rm $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.htm
