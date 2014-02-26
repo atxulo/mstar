@@ -3,11 +3,56 @@
 # Autor: Eneko Gonzalez
 #
 # Script para eliminar del fichero mstar_portolio_xxx.dat las lineas anteriores a una fecha
+AHORA=$(date +"%Y%m%d_%H%M%S_%N")
 
-# Comprobamos los parametros
+# Parametros que se leen de la linea de comandos con sus valores por defecto
+CARPETA_BACKUP=
+
+# Funcion para copiar un fichero en una ruta de backup
+# $1 ruta del fichero del que hacer backup
+backupFichero() {
+	nombreFichero="${1##*/}"
+	cp $1 $CARPETA_BACKUP"/"$AHORA"_"$nombreFichero".bak"
+}
+
+# Funcion para explicar como los parametros
+usage() {
+cat << EOF
+
+USO: $0 opciones mstar_portfolio_id.dat fecha(AAAAMMDD)
+
+OPCIONES:
+   -b [ruta]       Path de la carpeta donde dejar una copia de seguridad de los ficheros. Si no se indica, no se hace copia.
+
+EJEMPLOS:
+  $0 mstar_portfolio_2176038.dat 20131231   
+      
+	  Elimina del fichero mstar_portfolio_2176038.dat y mstar_portfolio_2176038.csv los datos anteriores al 31 de Dic. 2013 (incluido)
+EOF
+}
+
+# Leemos los parametros del script
+while getopts "b:" opt; do
+  case $opt in
+    b)
+      CARPETA_BACKUP=$OPTARG
+	  ;;
+    \?)
+      echo "Opcion desconocida: -$OPTARG" >&2
+      usage
+      exit 1
+      ;;
+    :)
+      echo "La opcion -$OPTARG requiere un parametro" >&2
+      usage
+      exit 1
+      ;;
+  esac
+done
+shift $((OPTIND-1))
 if (($# != 2)); then
   echo "ERROR; faltan parametros"
-  echo "Ejemplo: $0 mstar_portfolio_xxx.dat 20131231 para eliminar las lineas con fecha anterior al 31 de Dic. 2013 (incluido)"
+  usage
   exit 1
 fi
 
@@ -17,11 +62,21 @@ if [[ ! -f "$1" ]]; then
   exit 1
 fi
 
+# Nombre que debe tener el fichero CSV
+nombreCSV=${1%.dat}".csv"
+
+# Si se ha indicado, hacemos el backup
+if [ ! -z "$CARPETA_BACKUP" ]; then
+	# Si no existe la carpeta de backup, la intentamos crear
+	if [[ ! -d "${CARPETA_BACKUP}" ]]; then
+		mkdir "$CARPETA_BACKUP"
+	fi
+	backupFichero "$1"
+	backupFichero "$nombreCSV"
+fi
+
 # Eliminamos las lineas innecesarias del fichero .dat utilizando un fichero tmp intermedio
 awk -v cmpdate=$2 'BEGIN{FS=";"} {line=$0; aaaammdd=$3; if (aaaammdd>cmpdate) print line;}' $1 > $1.tmp && mv $1.tmp $1
 
-nombreCSV=${1%.dat}".csv"
-
-# Copiamos el fichero dat como csv y eliminamos las fechas AAAAMMDD que solo necesitabamos para ordenar
-cp $1 $nombreCSV
-sed -i -e 's/\;[0-9]*\;/\;/1' $nombreCSV
+# Copiamos el fichero dat como csv y eliminamos el nombre y fechas AAAAMMDD que solo necesitabamos para ordenar
+cut -d\; -f1,4- $1 > $nombreCSV
