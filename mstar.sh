@@ -9,7 +9,9 @@ AHORA=$(date +"%Y%m%d_%H%M%S_%N")
 CARPETA_BACKUP=
 FICHERO_COOKIES="cookies.txt"
 CARPETA_OUT="out"
+MSTAR_PASS=
 CARTERA_RAPIDA=false
+MSTAR_USER=
 VERBOSE=false
 PORTFOLIO_ID=
 
@@ -37,7 +39,9 @@ OPCIONES:
    -c [fichero]    Path del fichero con la cookie de morningstar.es. Por defecto $FICHERO_COOKIES
    -h              Muestra este mensaje de ayuda y finaliza
    -o [ruta]       Path de la carpeta donde dejar los ficheros resultado. Si no existe, la intenta crear
+   -p password     Password de morningstar, para generar el fichero de cookies (opcional)
    -r              Indica que la cartera MStar es de tipo rapida. Si no se indica, se supone transaccional
+   -u usuario      Password de morningstar, para generar el fichero de cookies (opcional)
    -v              Modo verbose para depurar los pasos ejecutados
 
 EJEMPLOS:
@@ -56,7 +60,7 @@ EOF
 }
 
 # Leemos los parametros del script
-while getopts "b:c:ho:rv" opt; do
+while getopts "b:c:ho:p:ru:v" opt; do
   case $opt in
     b)
       CARPETA_BACKUP=$OPTARG
@@ -71,9 +75,15 @@ while getopts "b:c:ho:rv" opt; do
     o)
       CARPETA_OUT=$OPTARG
       ;;
+    p)
+      MSTAR_PASS=$OPTARG
+      ;;
     r)
       CARTERA_RAPIDA=true
       ;;	  
+    u)
+      MSTAR_USER=$OPTARG
+      ;;		  
     v)
       VERBOSE=true
       ;;
@@ -96,6 +106,22 @@ if (( $# != 1 )); then
 	exit 1
 else 
 	PORTFOLIO_ID=$1
+fi
+
+# Si hay usuario y password, intentamos crear el fichero de cookies aunque ya exista
+if [ ! -z "$MSTAR_USER" ] && [ ! -z "$MSTAR_PASS" ]; then
+  mensaje "Generando fichero de cookies"
+  wget --keep-session-cookies --save-cookies $FICHERO_COOKIES --output-document=$CARPETA_OUT/mstar_login.html.tmp --post-data "__VIEWSTATE=%2FwEPDwUKLTI2ODU5ODc1OA9kFgJmD2QWAgIDD2QWBgIBD2QWAgIBDxYCHgRocmVmBThodHRwOi8vd3d3Lm1vcm5pbmdzdGFyLmVzL2VzL0RlZmF1bHQuYXNweD9yZWRpcmVjdD1mYWxzZWQCCQ9kFgYCAQ8PFgIeBFRleHQFBkVudHJhcmRkAgMPDxYEHwEFVE5vIHNlIGhhIHBvZGlkbyBjb25lY3Rhci4gwqFFbCBjb3JyZW8gZWxlY3Ryw7NuaWNvIG8gbGEgY29udHJhc2XDsWEgc29uIGluY29ycmVjdG9zIR4HVmlzaWJsZWdkZAIFDzwrAAoBAA8WAh4IVXNlck5hbWUFDHBlcGVAcGVwZS5lc2QWAmYPZBYCAgMPDxYCHwEFDHBlcGVAcGVwZS5lc2RkAg0PZBYCAgEPFgIfAQWNATxzY3JpcHQgdHlwZT0ndGV4dC9qYXZhc2NyaXB0Jz50cnkge3ZhciBwYWdlVHJhY2tlciA9IF9nYXQuX2dldFRyYWNrZXIoJ1VBLTE4NDMxNy04Jyk7cGFnZVRyYWNrZXIuX3RyYWNrUGFnZXZpZXcoKTt9IGNhdGNoIChlcnIpIHsgfTwvc2NyaXB0PmRk&__EVENTVALIDATION=%2FwEWBAKepfiyAwKOlq3CBgLPsofsAwL6hO7FCQ%3D%3D&ctl00%24_MobilePlaceHolder%24LoginPanel%24UserName=$MSTAR_USER&ctl00%24_MobilePlaceHolder%24LoginPanel%24Password=$MSTAR_PASS&ctl00%24_MobilePlaceHolder%24LoginPanel%24loginBtn=Login" "http://www.morningstar.es/es/mobile/membership/login.aspx"
+  
+  # Comprobamos si el fichero contiene el texto _loginError
+  grep "_loginError" "$CARPETA_OUT/mstar_login.html.tmp"
+  if [ $? -eq 0 ]; then
+    rm "$CARPETA_OUT/mstar_login.html.tmp"
+    mensaje "Error al generar el fichero de cookies; revisa el usuario y password"
+    exit 1
+  fi
+  rm "$CARPETA_OUT/mstar_login.html.tmp"
+  mensaje "Fichero de cookies generado"
 fi
 
 # Comprobamos si existe el fichero de cookies
