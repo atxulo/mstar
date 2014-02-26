@@ -41,7 +41,7 @@ OPCIONES:
    -o [ruta]       Path de la carpeta donde dejar los ficheros resultado. Si no existe, la intenta crear
    -p password     Password de morningstar, para generar el fichero de cookies (opcional)
    -r              Indica que la cartera MStar es de tipo rapida. Si no se indica, se supone transaccional
-   -u usuario      Password de morningstar, para generar el fichero de cookies (opcional)
+   -u usuario      Usuario de morningstar, para generar el fichero de cookies (opcional)
    -v              Modo verbose para depurar los pasos ejecutados
 
 EJEMPLOS:
