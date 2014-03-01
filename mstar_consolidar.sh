@@ -13,6 +13,10 @@ CARPETA_BACKUP=
 backupFichero() {
 	nombreFichero="${1##*/}"
 	cp $1 $CARPETA_BACKUP"/"$AHORA"_"$nombreFichero".bak"
+	if [ ! $? -eq 0 ]; then
+      echo "Error al hacer una copia de seguridad del fichero '$1' en '$CARPETA_BACKUP/$AHORA_$nombreFichero.bak', abortando."
+      exit 1
+    fi
 }
 
 # Funcion para explicar como los parametros
@@ -69,7 +73,11 @@ nombreCSV=${1%.dat}".csv"
 if [ ! -z "$CARPETA_BACKUP" ]; then
 	# Si no existe la carpeta de backup, la intentamos crear
 	if [[ ! -d "${CARPETA_BACKUP}" ]]; then
-		mkdir "$CARPETA_BACKUP"
+        mkdir "$CARPETA_BACKUP"
+        if [ ! $? -eq 0 ]; then
+          echo "Error crear la carpeta de backup '$CARPETA_BACKUP', abortando."
+          exit 1
+        fi
 	fi
 	backupFichero "$1"
 	backupFichero "$nombreCSV"

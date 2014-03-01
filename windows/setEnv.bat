@@ -12,3 +12,6 @@
 
 @REM Ruta de salida de los scripts
 @set MSTAR_SALIDA="c:\mstar\salida"
+
+@REM Ruta de copias de seguridad
+@set MSTAR_BACKUP="c:\mstar\backup"

@@ -20,6 +20,10 @@ PORTFOLIO_ID=
 backupFichero() {
 	nombreFichero="${1##*/}"
 	cp $1 $CARPETA_BACKUP"/"$AHORA"_"$nombreFichero".bak"
+	if [ $? -eq 0 ]; then
+      echo "Error al hacer una copia de seguridad del fichero '$1' en '$CARPETA_BACKUP/$AHORA_$nombreFichero.bak', abortando."
+      exit 1
+    fi	
 }
 
 # Funcion para escribir los mensajes en modo verbose
@@ -119,6 +123,10 @@ fi
 if [ ! -z "$CARPETA_BACKUP" ]; then
 	if [[ ! -d "${CARPETA_BACKUP}" ]]; then
 		mkdir "$CARPETA_BACKUP"
+        if [ ! $? -eq 0 ]; then
+          echo "Error crear la carpeta de backup '$CARPETA_BACKUP', abortando."
+          exit 1
+        fi
 	fi
 fi
 
