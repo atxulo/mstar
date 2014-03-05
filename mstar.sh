@@ -283,3 +283,5 @@ cut -d\; -f1,4- $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat > $CARPETA_OUT/ms
 # Borramos los ficheros temporales generados
 rm $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.htm
 rm $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat.tmp
+
+exit 0

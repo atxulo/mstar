@@ -88,3 +88,5 @@ awk -v cmpdate=$2 'BEGIN{FS=";"} {line=$0; aaaammdd=$3; if (aaaammdd>cmpdate) pr
 
 # Copiamos el fichero dat como csv y eliminamos el nombre y fechas AAAAMMDD que solo necesitabamos para ordenar
 cut -d\; -f1,4- $1 > $nombreCSV
+
+exit 0
