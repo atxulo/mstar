@@ -20,7 +20,7 @@ PORTFOLIO_ID=
 backupFichero() {
 	nombreFichero="${1##*/}"
 	cp $1 $CARPETA_BACKUP"/"$AHORA"_"$nombreFichero".bak"
-	if [ $? -eq 0 ]; then
+	if [ ! $? -eq 0 ]; then
       echo "Error al hacer una copia de seguridad del fichero '$1' en '$CARPETA_BACKUP/$AHORA_$nombreFichero.bak', abortando."
       exit 1
     fi	
@@ -136,8 +136,7 @@ if [ ! -z "$MSTAR_USER" ] && [ ! -z "$MSTAR_PASS" ]; then
   wget --verbose -o log  --keep-session-cookies --save-cookies $FICHERO_COOKIES --output-document=$CARPETA_OUT/mstar_login.html.tmp --post-data "__VIEWSTATE=%2FwEPDwUKLTI2ODU5ODc1OA9kFgJmD2QWAgIDD2QWBgIBD2QWAgIBDxYCHgRocmVmBThodHRwOi8vd3d3Lm1vcm5pbmdzdGFyLmVzL2VzL0RlZmF1bHQuYXNweD9yZWRpcmVjdD1mYWxzZWQCCQ9kFgYCAQ8PFgIeBFRleHQFBkVudHJhcmRkAgMPDxYEHwEFVE5vIHNlIGhhIHBvZGlkbyBjb25lY3Rhci4gwqFFbCBjb3JyZW8gZWxlY3Ryw7NuaWNvIG8gbGEgY29udHJhc2XDsWEgc29uIGluY29ycmVjdG9zIR4HVmlzaWJsZWdkZAIFDzwrAAoBAA8WAh4IVXNlck5hbWUFDHBlcGVAcGVwZS5lc2QWAmYPZBYCAgMPDxYCHwEFDHBlcGVAcGVwZS5lc2RkAg0PZBYCAgEPFgIfAQWNATxzY3JpcHQgdHlwZT0ndGV4dC9qYXZhc2NyaXB0Jz50cnkge3ZhciBwYWdlVHJhY2tlciA9IF9nYXQuX2dldFRyYWNrZXIoJ1VBLTE4NDMxNy04Jyk7cGFnZVRyYWNrZXIuX3RyYWNrUGFnZXZpZXcoKTt9IGNhdGNoIChlcnIpIHsgfTwvc2NyaXB0PmRk&__EVENTVALIDATION=%2FwEWBAKepfiyAwKOlq3CBgLPsofsAwL6hO7FCQ%3D%3D&ctl00%24_MobilePlaceHolder%24LoginPanel%24UserName=$MSTAR_USER&ctl00%24_MobilePlaceHolder%24LoginPanel%24Password=$MSTAR_PASS&ctl00%24_MobilePlaceHolder%24LoginPanel%24loginBtn=Login" "http://www.morningstar.es/es/mobile/membership/login.aspx"
   if [[ -f "${CARPETA_OUT}/mstar_login.html.tmp" ]]; then
 	# Comprobamos si el fichero contiene el texto _loginError
-	grep "_loginError" "$CARPETA_OUT/mstar_login.html.tmp"
-	if [ $? -eq 0 ]; then
+	if [grep -q "_loginError" "$CARPETA_OUT/mstar_login.html.tmp"]; then
       rm "$CARPETA_OUT/mstar_login.html.tmp"
       mensaje "Error al generar el fichero de cookies; revisa el usuario y password"
       exit 1
