@@ -29,7 +29,7 @@ backupFichero() {
 # Funcion para escribir los mensajes en modo verbose
 # $1 mensaje a escribir
 mensaje() {
-	if [[ "$VERBOSE" = true ]]; then echo $1; fi
+	if [[ "$VERBOSE" = true ]]; then echo $1 1>&2; fi
 }
 
 # Funcion para explicar como los parametros
@@ -136,7 +136,8 @@ if [ ! -z "$MSTAR_USER" ] && [ ! -z "$MSTAR_PASS" ]; then
   wget --verbose -o log  --keep-session-cookies --save-cookies $FICHERO_COOKIES --output-document=$CARPETA_OUT/mstar_login.html.tmp --post-data "__VIEWSTATE=%2FwEPDwUKLTI2ODU5ODc1OA9kFgJmD2QWAgIDD2QWBgIBD2QWAgIBDxYCHgRocmVmBThodHRwOi8vd3d3Lm1vcm5pbmdzdGFyLmVzL2VzL0RlZmF1bHQuYXNweD9yZWRpcmVjdD1mYWxzZWQCCQ9kFgYCAQ8PFgIeBFRleHQFBkVudHJhcmRkAgMPDxYEHwEFVE5vIHNlIGhhIHBvZGlkbyBjb25lY3Rhci4gwqFFbCBjb3JyZW8gZWxlY3Ryw7NuaWNvIG8gbGEgY29udHJhc2XDsWEgc29uIGluY29ycmVjdG9zIR4HVmlzaWJsZWdkZAIFDzwrAAoBAA8WAh4IVXNlck5hbWUFDHBlcGVAcGVwZS5lc2QWAmYPZBYCAgMPDxYCHwEFDHBlcGVAcGVwZS5lc2RkAg0PZBYCAgEPFgIfAQWNATxzY3JpcHQgdHlwZT0ndGV4dC9qYXZhc2NyaXB0Jz50cnkge3ZhciBwYWdlVHJhY2tlciA9IF9nYXQuX2dldFRyYWNrZXIoJ1VBLTE4NDMxNy04Jyk7cGFnZVRyYWNrZXIuX3RyYWNrUGFnZXZpZXcoKTt9IGNhdGNoIChlcnIpIHsgfTwvc2NyaXB0PmRk&__EVENTVALIDATION=%2FwEWBAKepfiyAwKOlq3CBgLPsofsAwL6hO7FCQ%3D%3D&ctl00%24_MobilePlaceHolder%24LoginPanel%24UserName=$MSTAR_USER&ctl00%24_MobilePlaceHolder%24LoginPanel%24Password=$MSTAR_PASS&ctl00%24_MobilePlaceHolder%24LoginPanel%24loginBtn=Login" "http://www.morningstar.es/es/mobile/membership/login.aspx"
   if [[ -f "${CARPETA_OUT}/mstar_login.html.tmp" ]]; then
 	# Comprobamos si el fichero contiene el texto _loginError
-	if [grep -q "_loginError" "$CARPETA_OUT/mstar_login.html.tmp"]; then
+	grep "_loginError" "$CARPETA_OUT/mstar_login.html.tmp" > /dev/null
+	if [ $? -eq 0 ]; then
       rm "$CARPETA_OUT/mstar_login.html.tmp"
       mensaje "Error al generar el fichero de cookies; revisa el usuario y password"
       exit 1
@@ -177,12 +178,6 @@ if [ $? -ne 0 ]; then
   echo "Error al descargar el portfolio de http://www.morningstar.es/es/portfoliomanager/portfolio.aspx?Portfolio_ID=$PORTFOLIO_ID, abortando"
   exit $?
 fi
-# Usado para pruebas sin conexion https a Mstar
-#if [[ "$CARTERA_RAPIDA" = true ]]; then 
-#  cp cartera_rapida.html $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.htm
-#else
-#  cp cartera_transaccional.html $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.htm
-#fi
 
 # Leemos el fichero descargado y lo convertimos en un fichero con este formato: "ID;Nombre;AAAAMMDD;Fecha;VL;MONEDA"
 if [[ "$CARTERA_RAPIDA" = true ]]; then 
@@ -204,12 +199,29 @@ while read linea_dat_tmp; do
           echo "Error al obtener el ISIN '$isin' del fichero '$CARPETA_OUT/mstar_isin_$PORTFOLIO_ID.dat', abortando" 1>&2
 		  exit 1
 		fi
+
 	else
-		isin=$(wget -O- http://www.morningstar.es/es/funds/snapshot/snapshot.aspx?id=$mstar_id | sed -n -e 's/.*heading\">ISIN<\/td>.*text">\([^<]*\).*Patrimonio (.*/\1/p')
-		if [ ! $? -eq 0 ] || [ -z "$isin" ]; then
-		  echo "Error al obtener el ISIN '$isin' de 'http://www.morningstar.es/es/funds/snapshot/snapshot.aspx?id=$mstar_id', abortando" 1>&2
-          exit 1
+		wget --output-document=$CARPETA_OUT/mstar_$mstar_id.html.tmp "http://www.morningstar.es/es/funds/snapshot/snapshot.aspx?id=$mstar_id"
+		
+		# Comprobamos si el fichero contiene el texto ISIN (es un fondo) o DGS (es un plan de pensiones)
+		isin=$(cat "$CARPETA_OUT/mstar_$mstar_id.html.tmp" | sed -n -e 's/.*heading\">ISIN<\/td>.*text">\([^<]*\).*Patrimonio (.*/\1/p')
+		if [ ! -z "$isin" ]; then
+		  mensaje "Obtenido isin $isin para id $mstar_id"
+		else
+          isin=$(cat "$CARPETA_OUT/mstar_$mstar_id.html.tmp" | sed -n -e 's/.*DGS<\/div><div class=\"value_div text\">\([^<]*\)<\/div>.*/\1/p')
+          if [ ! -z "$isin" ]; then
+		    mensaje "Obtenido dgs $isin para id $mstar_id"
+	      fi
 		fi
+		
+		if [ -z "$isin" ]; then
+		  echo "Error al obtener el ISIN o DGS para el fondo '$mstar_id' de la pagina de morningstar, abortando" 1>&2
+		  rm "$CARPETA_OUT/mstar_$mstar_id.html.tmp"
+          exit 1
+        fi
+
+		rm "$CARPETA_OUT/mstar_$mstar_id.html.tmp"
+		# Escribimos el ISIN/DGS en el fichero
 		echo "$mstar_id=$isin" >> $CARPETA_OUT/mstar_isin_$PORTFOLIO_ID.dat
 	fi
 	
