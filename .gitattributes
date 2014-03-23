@@ -1,0 +1,16 @@
+# Mas info https://help.github.com/articles/dealing-with-line-endings
+# Por defecto, todos los ficheros tienen el salto de linea como indica 
+# la plataforma del cliente que lo descarga
+* text=auto
+
+# Estos ficheros se deben mantener con salto de linea como en Linux
+# o no funcionaran correctamente
+*.sh text eol=lf
+*.dat text eol=lf
+*.csv text eol=lf
+
+# Ficheros especificos de windows, les ponemos el salto de lina de Windows
+*.bat text eol=crlf
+
+# Ficheros binarios que no deben ser alterados
+*.xlsm binary
