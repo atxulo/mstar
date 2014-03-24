@@ -2,10 +2,11 @@
 #
 # Autor: Eneko Gonzalez
 #
-# Script para generar uno o varios ficheros CSV a partir de una cartera de la pagina Morningstar.es
+# Script para generar un fichero CSV a partir de una cartera de la pagina Morningstar.es
 AHORA=$(date +"%Y%m%d_%H%M%S_%N")
 
 # Parametros que se leen de la linea de comandos con sus valores por defecto
+ALIAS=
 CARPETA_BACKUP=
 FICHERO_COOKIES="cookies.txt"
 CARPETA_OUT="out"
@@ -32,6 +33,20 @@ mensaje() {
 	if [[ "$VERBOSE" = true ]]; then echo $1 1>&2; fi
 }
 
+# Funcion para comprobar si el login se ha hecho correctamente
+# $1 ruta del fichero html descargado de Morningstar.es
+comprobarLogin() {
+  # Buscamos el texto "Bienvenido a Morningstar, " para comprobar el nombre de usuario
+  nombreUsuario=$(cat "$1" | sed -n -e 's/.*Bienvenido a Morningstar[, ]*\(.*\)/\1/p')
+  if [ -z "$nombreUsuario" ]; then
+	echo "Error al hacer login en la pagina de morningstar.es (comprueba el usuario y password), abortando." 1>&2
+	rm "$1"
+	exit 1
+  else
+    mensaje "Login verificado; nombre del usuario $nombreUsuario"
+  fi	
+}
+
 # Funcion para explicar como los parametros
 usage() {
 cat << EOF
@@ -39,6 +54,7 @@ cat << EOF
 USO: $0 opciones portfolio_id
 
 OPCIONES:
+   -a alias        Alias de la cartera. Si se indica, los ficheros generados se llamaran xxx_ALIAS en vez de xxx_ID.
    -b [ruta]       Path de la carpeta donde dejar una copia de seguridad de los ficheros. Si no se indica, no se hace copia.
    -c [fichero]    Path del fichero con la cookie de morningstar.es. Por defecto $FICHERO_COOKIES
    -h              Muestra este mensaje de ayuda y finaliza
@@ -64,8 +80,11 @@ EOF
 }
 
 # Leemos los parametros del script
-while getopts "b:c:ho:p:ru:v" opt; do
+while getopts "a:b:c:ho:p:ru:v" opt; do
   case $opt in
+    a)
+      ALIAS=$OPTARG
+      ;;  
     b)
       CARPETA_BACKUP=$OPTARG
 	  ;;
@@ -112,6 +131,13 @@ else
 	PORTFOLIO_ID=$1
 fi
 
+# Calculamos el sujijo de los ficheros; si hay alias es el alias, si no, el ID
+if [ ! -z "$ALIAS" ]; then
+  sufijo=$ALIAS
+else
+  sufijo=$PORTFOLIO_ID
+fi
+
 # Si no existe la carpeta de salida, la intentamos crear
 if [[ ! -d "${CARPETA_OUT}" ]]; then
 	mensaje "La carpeta $CARPETA_OUT no existe"
@@ -139,7 +165,7 @@ if [ ! -z "$MSTAR_USER" ] && [ ! -z "$MSTAR_PASS" ]; then
 	grep "_loginError" "$CARPETA_OUT/mstar_login.html.tmp" > /dev/null
 	if [ $? -eq 0 ]; then
       rm "$CARPETA_OUT/mstar_login.html.tmp"
-      mensaje "Error al generar el fichero de cookies; revisa el usuario y password"
+      echo "Error al generar el fichero de cookies (revisa el usuario y password) abortando" 1>&2
       exit 1
     fi
     rm "$CARPETA_OUT/mstar_login.html.tmp"
@@ -154,36 +180,52 @@ if [[ ! -f "${FICHERO_COOKIES}" ]]; then
 fi
 
 # Creamos los ficheros dat si no existen, y si existen, hacemos backup si asi se ha indicado
-if [ ! -f $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat ]; then
-  > $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat
-  mensaje "Creado fichero $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat"
+if [ ! -f $CARPETA_OUT/mstar_portfolio_$sufijo.dat ]; then
+  > $CARPETA_OUT/mstar_portfolio_$sufijo.dat
+  mensaje "Creado fichero $CARPETA_OUT/mstar_portfolio_$sufijo.dat"
 else
   if [ ! -z "$CARPETA_BACKUP" ]; then
-    backupFichero "$CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat"
+    backupFichero "$CARPETA_OUT/mstar_portfolio_$sufijo.dat"
   fi
+  # Eliminamos los saltos de linea tipo Windows o Mac del fichero .dat por si se ha editado manualmente
+  # No usamos sed -i porque en MacOS da problemas: http://stackoverflow.com/questions/5694228/sed-in-place-flag-that-works-both-on-mac-bsd-and-linux
+  sed -e "s/\r//" "$CARPETA_OUT/mstar_portfolio_$sufijo.dat" > "$CARPETA_OUT/mstar_portfolio_$sufijo.dat.tmp"
+  mv "$CARPETA_OUT/mstar_portfolio_$sufijo.dat.tmp" "$CARPETA_OUT/mstar_portfolio_$sufijo.dat"
 fi
 
-if [ ! -f $CARPETA_OUT/mstar_isin_$PORTFOLIO_ID.dat ]; then
-  echo "# ID_MSTAR = ISIN" > $CARPETA_OUT/mstar_isin_$PORTFOLIO_ID.dat
-  mensaje "Creado fichero $CARPETA_OUT/mstar_isin_$PORTFOLIO_ID.dat"
+if [ ! -f $CARPETA_OUT/mstar_isin_$sufijo.dat ]; then
+  echo "# ID_MSTAR = ISIN" > $CARPETA_OUT/mstar_isin_$sufijo.dat
+  mensaje "Creado fichero $CARPETA_OUT/mstar_isin_$sufijo.dat"
 else
   if [ ! -z "$CARPETA_BACKUP" ]; then
-    backupFichero "$CARPETA_OUT/mstar_isin_$PORTFOLIO_ID.dat"
+    backupFichero "$CARPETA_OUT/mstar_isin_$sufijo.dat"
   fi
 fi
 
 # Nos conectamos a la pagina para extraer los datos de la cartera
-wget --load-cookies $FICHERO_COOKIES --output-document=$CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.htm "http://www.morningstar.es/es/portfoliomanager/portfolio.aspx?Portfolio_ID=$PORTFOLIO_ID"
+wget --load-cookies $FICHERO_COOKIES --output-document=$CARPETA_OUT/mstar_portfolio_$sufijo.html.tmp "http://www.morningstar.es/es/portfoliomanager/portfolio.aspx?Portfolio_ID=$PORTFOLIO_ID"
 if [ $? -ne 0 ]; then
   echo "Error al descargar el portfolio de http://www.morningstar.es/es/portfoliomanager/portfolio.aspx?Portfolio_ID=$PORTFOLIO_ID, abortando"
   exit $?
+else
+  # Comprobamos que el login sea correcto
+  comprobarLogin "$CARPETA_OUT/mstar_portfolio_$sufijo.html.tmp"
+  
+  # Comprobamos que el html descargado tiene fondos
+  # "portfolio_addHoldingPanel" es la clase de la tabla que contiene los fondos y sus VLs, si no se encuentra es que no hay fondos o el ID no es correcto
+  grep "portfolio_addHoldingPanel" "$CARPETA_OUT/mstar_portfolio_$sufijo.html.tmp" > /dev/null
+  if [ ! $? -eq 0 ]; then
+    rm "$CARPETA_OUT/mstar_portfolio_$sufijo.html.tmp"
+    echo "Error al obtener los fondos de la pagina de morningstar.es (comprueba que el ID de portfolio es correcto y que tiene fondos), abortando." 1>&2
+    exit 1
+  fi
 fi
 
 # Leemos el fichero descargado y lo convertimos en un fichero con este formato: "ID;Nombre;AAAAMMDD;Fecha;VL;MONEDA"
 if [[ "$CARTERA_RAPIDA" = true ]]; then 
-  cat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.htm | gawk 'match( $0, /snapshot\.aspx\?id=([A-Za-z0-9]*)">([^<]*).*title="([^"/]*)\/([^/]*)\/([^"]*)[^>]*>([^<]*)<.*msDataText[^>]*>([^<]*)/, grupos) { print grupos[1] ";" grupos[2] ";" grupos[5] grupos[4] grupos[3] ";" grupos[3] "/" grupos[4] "/" grupos[5] ";" grupos[6] ";" grupos[7]}' > $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat.tmp  
+  cat $CARPETA_OUT/mstar_portfolio_$sufijo.html.tmp | gawk 'match( $0, /snapshot\.aspx\?id=([A-Za-z0-9]*)">([^<]*).*title="([^"/]*)\/([^/]*)\/([^"]*)[^>]*>([^<]*)<.*msDataText[^>]*>([^<]*)/, grupos) { print grupos[1] ";" grupos[2] ";" grupos[5] grupos[4] grupos[3] ";" grupos[3] "/" grupos[4] "/" grupos[5] ";" grupos[6] ";" grupos[7]}' > $CARPETA_OUT/mstar_portfolio_$sufijo.dat.tmp  
 else
-  cat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.htm | gawk 'match( $0, /snapshot\.aspx\?id=([A-Za-z0-9]*)">([^<]*).*title="([^"/]*)\/([^/]*)\/([^"]*)[^>]*>([^<]*)/, grupos) { print grupos[1] ";" grupos[2] ";" grupos[5] grupos[4] grupos[3] ";" grupos[3] "/" grupos[4] "/" grupos[5] ";" grupos[6] ";EUR"}' > $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat.tmp 
+  cat $CARPETA_OUT/mstar_portfolio_$sufijo.html.tmp | gawk 'match( $0, /snapshot\.aspx\?id=([A-Za-z0-9]*)">([^<]*).*title="([^"/]*)\/([^/]*)\/([^"]*)[^>]*>([^<]*)/, grupos) { print grupos[1] ";" grupos[2] ";" grupos[5] grupos[4] grupos[3] ";" grupos[3] "/" grupos[4] "/" grupos[5] ";" grupos[6] ";EUR"}' > $CARPETA_OUT/mstar_portfolio_$sufijo.dat.tmp 
 fi
 
 # Leemos el fichero temporal descargado
@@ -191,12 +233,12 @@ while read linea_dat_tmp; do
 	mstar_id=${linea_dat_tmp%%;*}
 	
 	# Leemos el ISIN del fichero o de MStar si no lo tenemos
-	isin_dat=$(grep "$mstar_id=" "$CARPETA_OUT/mstar_isin_$PORTFOLIO_ID.dat")
+	isin_dat=$(grep "$mstar_id=" "$CARPETA_OUT/mstar_isin_$sufijo.dat")
 	if [ $? -eq 0 ]; then
 		# Nos quedamos con la parte derecha de la linea del fichero de configuracion
 		isin=${isin_dat#*=} 
 		if [ -z "$isin" ]; then
-          echo "Error al obtener el ISIN '$isin' del fichero '$CARPETA_OUT/mstar_isin_$PORTFOLIO_ID.dat', abortando" 1>&2
+          echo "Error al obtener el ISIN '$isin' del fichero '$CARPETA_OUT/mstar_isin_$sufijo.dat', abortando" 1>&2
 		  exit 1
 		fi
 
@@ -222,7 +264,7 @@ while read linea_dat_tmp; do
 
 		rm "$CARPETA_OUT/mstar_$mstar_id.html.tmp"
 		# Escribimos el ISIN/DGS en el fichero
-		echo "$mstar_id=$isin" >> $CARPETA_OUT/mstar_isin_$PORTFOLIO_ID.dat
+		echo "$mstar_id=$isin" >> $CARPETA_OUT/mstar_isin_$sufijo.dat
 	fi
 	
 	# Miramos la moneda del VL (nos quedamos con lo que esta a la derecha del ultimo ;)
@@ -243,10 +285,10 @@ while read linea_dat_tmp; do
 	  cambioVL="1"
 	elif [[ "$moneda" = "USD" ]]; then
 	  # Descargamos el cambio euro-dolar del dia del vl
-	  wget --output-document=$CARPETA_OUT/mstar_euro_dolar.htm.tmp "http://sdw.ecb.europa.eu/quickview.do?SERIES_KEY=120.EXR.D.USD.EUR.SP00.A&start=${fechaVLGuion}&end=${fechaVLGuion}&ubmitOptions.x=55&submitOptions.y=4&trans=N"
+	  wget --output-document=$CARPETA_OUT/mstar_euro_dolar.html.tmp "http://sdw.ecb.europa.eu/quickview.do?SERIES_KEY=120.EXR.D.USD.EUR.SP00.A&start=${fechaVLGuion}&end=${fechaVLGuion}&ubmitOptions.x=55&submitOptions.y=4&trans=N"
       if [ $? -ne 0 ]; then
         echo "Error al descargar la informacion de 'http://sdw.ecb.europa.eu/quickview.do?SERIES_KEY=120.EXR.D.USD.EUR.SP00.A&start=${fechaVLGuion}$end=${fechaVLGuion}&ubmitOptions.x=55&submitOptions.y=4&trans=N', abortando"
-		rm $CARPETA_OUT/mstar_euro_dolar.htm.tmp
+		rm $CARPETA_OUT/mstar_euro_dolar.html.tmp
         exit $?
       fi
 	  # Leemos el fichero descargado y lo obtenemos el valor
@@ -255,8 +297,8 @@ while read linea_dat_tmp; do
       # Elimina las que no tengan 8%
       # Extrae el valor (#.####)
       # Elimina las lineas que no han podido ser formateada y aun tienen el 8%
-	  cambioVL=$(cat $CARPETA_OUT/mstar_euro_dolar.htm.tmp | sed -e '1,/table class=\"tablestats\">/d' -e '/\/table/,$ d' -e '/8%/ !d' -e 's/.*8%[^>]*>[0-9]*-[0-9]*-[0-9]*<\/td\>.*right\;\">\([0-9]*\)\.\([0-9]*\).*/\1.\2/' -e '/8%/ d')
-	  rm $CARPETA_OUT/mstar_euro_dolar.htm.tmp
+	  cambioVL=$(cat $CARPETA_OUT/mstar_euro_dolar.html.tmp | sed -e '1,/table class=\"tablestats\">/d' -e '/\/table/,$ d' -e '/8%/ !d' -e 's/.*8%[^>]*>[0-9]*-[0-9]*-[0-9]*<\/td\>.*right\;\">\([0-9]*\)\.\([0-9]*\).*/\1.\2/' -e '/8%/ d')
+	  rm $CARPETA_OUT/mstar_euro_dolar.html.tmp
 	else
       # No sabemos que moneda es
 	  cambioVL="ERROR"
@@ -276,23 +318,24 @@ while read linea_dat_tmp; do
 	echo ${linea_dat_tmp//$mstar_id/$isin} 
 	
 	# Guardamos la linea modificada en el fichero
-done <$CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat.tmp > $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat.tmp.2; mv $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat.tmp{.2,}
+done <$CARPETA_OUT/mstar_portfolio_$sufijo.dat.tmp > $CARPETA_OUT/mstar_portfolio_$sufijo.dat.tmp.2; mv $CARPETA_OUT/mstar_portfolio_$sufijo.dat.tmp{.2,}
 
 # Juntamos el fichero temporal con el dat, ordenando alfabeticamente (asc) y por fecha (desc)
-cat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat.tmp | sort -u -t\; -k3,3r -k2,2 -o $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat
+cat $CARPETA_OUT/mstar_portfolio_$sufijo.dat $CARPETA_OUT/mstar_portfolio_$sufijo.dat.tmp | sort -u -t\; -k3,3r -k2,2 -o $CARPETA_OUT/mstar_portfolio_$sufijo.dat
 
 # Si ya existe el CSV, hacemos el backup si asi se ha indicado 
-if [[ -f "${CARPETA_OUT}/mstar_portfolio_$PORTFOLIO_ID.csv" ]]; then
+if [[ -f "${CARPETA_OUT}/mstar_portfolio_$sufijo.csv" ]]; then
   if [ ! -z "$CARPETA_BACKUP" ]; then
-    backupFichero "$CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.csv"
+    backupFichero "$CARPETA_OUT/mstar_portfolio_$sufijo.csv"
   fi
 fi
 
 # Copiamos el fichero dat como csv y eliminamos el nombre y fechas AAAAMMDD que solo necesitabamos para ordenar
-cut -d\; -f1,4- $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat > $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.csv
+cut -d\; -f1,4- $CARPETA_OUT/mstar_portfolio_$sufijo.dat > $CARPETA_OUT/mstar_portfolio_$sufijo.csv
 
 # Borramos los ficheros temporales generados
-rm $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.htm
-rm $CARPETA_OUT/mstar_portfolio_$PORTFOLIO_ID.dat.tmp
+rm $CARPETA_OUT/mstar_portfolio_$sufijo.html.tmp
+rm $CARPETA_OUT/mstar_portfolio_$sufijo.dat.tmp
 
+mensaje "Proceso finalizado correctamente"
 exit 0
