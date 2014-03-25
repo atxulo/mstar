@@ -1,4 +1,4 @@
-## 1.1.0 (24/03/2014)
+## 1.1.0-beta1 (24/03/2014)
 
 Correciones:
 
@@ -10,4 +10,4 @@ Cambios:
 
   - Añadido parametro -a para permitir cambiar de nombre a los ficheros generados (https://github.com/enekogb/mstar/issues/47)
   - Añadida verificación de que el login se ha hecho correctamente (https://github.com/enekogb/mstar/issues/36)
-  - El script mstar.sh ajusta los saltos de linea del fichero DAT en cada ejecución para permitir la edición del mismo.
+  - Añadido nuevo script mstar_ftimes.sh para obtener los datos de ftimes.
