@@ -190,8 +190,8 @@ else
   # Eliminamos los saltos de linea tipo Windows o Mac del fichero .dat por si se ha editado manualmente
   # No usamos sed -i porque en MacOS da problemas: http://stackoverflow.com/questions/5694228/sed-in-place-flag-that-works-both-on-mac-bsd-and-linux
   # Asi que usamos esto
-  sed -e $'s/\r//' "$CARPETA_OUT/mstar_portfolio_$sufijo.dat" > "$CARPETA_OUT/mstar_portfolio_$sufijo.dat.tmp"
-  mv "$CARPETA_OUT/mstar_portfolio_$sufijo.dat.tmp" "$CARPETA_OUT/mstar_portfolio_$sufijo.dat"
+  # sed -e $'s/\r//' "$CARPETA_OUT/mstar_portfolio_$sufijo.dat" > "$CARPETA_OUT/mstar_portfolio_$sufijo.dat.tmp"
+  # mv "$CARPETA_OUT/mstar_portfolio_$sufijo.dat.tmp" "$CARPETA_OUT/mstar_portfolio_$sufijo.dat"
 fi
 
 if [ ! -f $CARPETA_OUT/mstar_isin_$sufijo.dat ]; then
@@ -269,7 +269,7 @@ while read linea_dat_tmp; do
 	fi
 	
 	# Miramos la moneda del VL (nos quedamos con lo que esta a la derecha del ultimo ;)
-    moneda=${linea_dat_tmp##*\;}
+  moneda=${linea_dat_tmp##*\;}
 	# Quitamos la moneda y obtenemos el ultimo valor, el VL en esa Moneda
 	linea_dat_tmp=${linea_dat_tmp%\;*}
 	vlMoneda=${linea_dat_tmp##*\;}
@@ -289,7 +289,7 @@ while read linea_dat_tmp; do
 	  wget --output-document=$CARPETA_OUT/mstar_euro_dolar.html.tmp "http://sdw.ecb.europa.eu/quickview.do?SERIES_KEY=120.EXR.D.USD.EUR.SP00.A&start=${fechaVLGuion}&end=${fechaVLGuion}&ubmitOptions.x=55&submitOptions.y=4&trans=N"
       if [ $? -ne 0 ]; then
         echo "Error al descargar la informacion de 'http://sdw.ecb.europa.eu/quickview.do?SERIES_KEY=120.EXR.D.USD.EUR.SP00.A&start=${fechaVLGuion}$end=${fechaVLGuion}&ubmitOptions.x=55&submitOptions.y=4&trans=N', abortando"
-		rm $CARPETA_OUT/mstar_euro_dolar.html.tmp
+		    rm $CARPETA_OUT/mstar_euro_dolar.html.tmp
         exit $?
       fi
 	  # Leemos el fichero descargado y lo obtenemos el valor
