@@ -190,8 +190,8 @@ else
   # Eliminamos los saltos de linea tipo Windows o Mac del fichero .dat por si se ha editado manualmente
   # No usamos sed -i porque en MacOS da problemas: http://stackoverflow.com/questions/5694228/sed-in-place-flag-that-works-both-on-mac-bsd-and-linux
   # Asi que usamos esto
-  # sed -e $'s/\r//' "$CARPETA_OUT/mstar_portfolio_$sufijo.dat" > "$CARPETA_OUT/mstar_portfolio_$sufijo.dat.tmp"
-  # mv "$CARPETA_OUT/mstar_portfolio_$sufijo.dat.tmp" "$CARPETA_OUT/mstar_portfolio_$sufijo.dat"
+  sed -e $'s/\r//' "$CARPETA_OUT/mstar_portfolio_$sufijo.dat" > "$CARPETA_OUT/mstar_portfolio_$sufijo.dat.tmp"
+  mv "$CARPETA_OUT/mstar_portfolio_$sufijo.dat.tmp" "$CARPETA_OUT/mstar_portfolio_$sufijo.dat"
 fi
 
 if [ ! -f $CARPETA_OUT/mstar_isin_$sufijo.dat ]; then
@@ -222,17 +222,22 @@ else
   fi
 fi
 
-# Leemos el fichero descargado y lo convertimos en un fichero con este formato: "ID;Nombre;AAAAMMDD;Fecha;VL;MONEDA"
+# Leemos el fichero descargado y lo convertimos en un fichero con este formato: "URL;ID;Nombre;AAAAMMDD;Fecha;VL;MONEDA"
 if [[ "$CARTERA_RAPIDA" = true ]]; then 
-  cat $CARPETA_OUT/mstar_portfolio_$sufijo.html.tmp | gawk 'match( $0, /snapshot\.aspx\?id=([A-Za-z0-9]*)">([^<]*).*title="([^"/]*)\/([^/]*)\/([^"]*)[^>]*>([^<]*)<.*msDataText[^>]*>([^<]*)/, grupos) { print grupos[1] ";" grupos[2] ";" grupos[5] grupos[4] grupos[3] ";" grupos[3] "/" grupos[4] "/" grupos[5] ";" grupos[6] ";" grupos[7]}' > $CARPETA_OUT/mstar_portfolio_$sufijo.dat.tmp  
+  cat $CARPETA_OUT/mstar_portfolio_$sufijo.html.tmp | gawk 'match( $0, /href="([^"]*(snapshot|default)\.aspx\?id=([A-Za-z0-9]*))">([^<]*).*title="([^"/]*)\/([^/]*)\/([^"]*)[^>]*>([^<]*)<.*msDataText[^>]*>([^<]*)/, grupos) { print grupos[1] ";" grupos[3] ";" grupos[4] ";" grupos[7] grupos[6] grupos[5] ";" grupos[5] "/" grupos[6] "/" grupos[7] ";" grupos[8] ";" grupos[9]}' > $CARPETA_OUT/mstar_portfolio_$sufijo.dat.tmp  
 else
-  cat $CARPETA_OUT/mstar_portfolio_$sufijo.html.tmp | gawk 'match( $0, /snapshot\.aspx\?id=([A-Za-z0-9]*)">([^<]*).*title="([^"/]*)\/([^/]*)\/([^"]*)[^>]*>([^<]*)/, grupos) { print grupos[1] ";" grupos[2] ";" grupos[5] grupos[4] grupos[3] ";" grupos[3] "/" grupos[4] "/" grupos[5] ";" grupos[6] ";EUR"}' > $CARPETA_OUT/mstar_portfolio_$sufijo.dat.tmp 
+  cat $CARPETA_OUT/mstar_portfolio_$sufijo.html.tmp | gawk 'match( $0, /href="([^"]*(snapshot|default)\.aspx\?id=([A-Za-z0-9]*))">([^<]*).*title="([^"/]*)\/([^/]*)\/([^"]*)[^>]*>([^<]*)/, grupos) { print grupos[1] ";" grupos[3] ";" grupos[4] ";" grupos[7] grupos[6] grupos[5] ";" grupos[5] "/" grupos[6] "/" grupos[7] ";" grupos[8] ";EUR"}' > $CARPETA_OUT/mstar_portfolio_$sufijo.dat.tmp
 fi
 
 # Leemos el fichero temporal descargado
 while read linea_dat_tmp; do
+    # Cogemos la url eliminando todo a partir del primer ;
+	urlDetalleMstar=${linea_dat_tmp%%;*}
+	# Eliminamos la URL de la linea eliminando todo hasta el primer ; porque no la necesitamos mas
+	linea_dat_tmp=${linea_dat_tmp#*;}
+	# Cogemos el isin eliminando todo a partir del primer ;
 	mstar_id=${linea_dat_tmp%%;*}
-	
+
 	# Leemos el ISIN del fichero o de MStar si no lo tenemos
 	isin_dat=$(grep "$mstar_id=" "$CARPETA_OUT/mstar_isin_$sufijo.dat")
 	if [ $? -eq 0 ]; then
@@ -244,16 +249,23 @@ while read linea_dat_tmp; do
 		fi
 
 	else
-		wget --output-document=$CARPETA_OUT/mstar_$mstar_id.html.tmp "http://www.morningstar.es/es/funds/snapshot/snapshot.aspx?id=$mstar_id"
+		wget --output-document=$CARPETA_OUT/mstar_$mstar_id.html.tmp "http://www.morningstar.es$urlDetalleMstar"
 		
-		# Comprobamos si el fichero contiene el texto ISIN (es un fondo) o DGS (es un plan de pensiones)
+		# Comprobamos si el fichero contiene el texto ISIN (es un fondo o acciones) o DGS (es un plan de pensiones)
 		isin=$(cat "$CARPETA_OUT/mstar_$mstar_id.html.tmp" | sed -n -e 's/.*heading\">ISIN<\/td>.*text">\([^<]*\).*Patrimonio (.*/\1/p')
 		if [ ! -z "$isin" ]; then
-		  mensaje "Obtenido isin $isin para id $mstar_id"
+		  mensaje "Obtenido isin $isin para fondo con id $mstar_id"
 		else
-          isin=$(cat "$CARPETA_OUT/mstar_$mstar_id.html.tmp" | sed -n -e 's/.*DGS<\/div><div class=\"value_div text\">\([^<]*\)<\/div>.*/\1/p')
-          if [ ! -z "$isin" ]; then
-		    mensaje "Obtenido dgs $isin para id $mstar_id"
+		  # Buscamos como aparece en el caso de las acciones
+          isin=$(cat "$CARPETA_OUT/mstar_$mstar_id.html.tmp" | sed -n -e 's/.*\"Col0Isin\">\([^<]*\)<.*/\1/p')
+		  if [ ! -z "$isin" ]; then
+		    mensaje "Obtenido isin $isin para acciones con id $mstar_id"
+		  else
+		    # Buscamos como aparece en el caso de los planes de pensiones
+			isin=$(cat "$CARPETA_OUT/mstar_$mstar_id.html.tmp" | sed -n -e 's/.*DGS<\/div><div class=\"value_div text\">\([^<]*\)<\/div>.*/\1/p')
+            if [ ! -z "$isin" ]; then
+		      mensaje "Obtenido codigo dgs $isin para plan de pensiones con id $mstar_id"
+			fi
 	      fi
 		fi
 		
@@ -269,7 +281,7 @@ while read linea_dat_tmp; do
 	fi
 	
 	# Miramos la moneda del VL (nos quedamos con lo que esta a la derecha del ultimo ;)
-  moneda=${linea_dat_tmp##*\;}
+    moneda=${linea_dat_tmp##*\;}
 	# Quitamos la moneda y obtenemos el ultimo valor, el VL en esa Moneda
 	linea_dat_tmp=${linea_dat_tmp%\;*}
 	vlMoneda=${linea_dat_tmp##*\;}
@@ -289,7 +301,7 @@ while read linea_dat_tmp; do
 	  wget --output-document=$CARPETA_OUT/mstar_euro_dolar.html.tmp "http://sdw.ecb.europa.eu/quickview.do?SERIES_KEY=120.EXR.D.USD.EUR.SP00.A&start=${fechaVLGuion}&end=${fechaVLGuion}&ubmitOptions.x=55&submitOptions.y=4&trans=N"
       if [ $? -ne 0 ]; then
         echo "Error al descargar la informacion de 'http://sdw.ecb.europa.eu/quickview.do?SERIES_KEY=120.EXR.D.USD.EUR.SP00.A&start=${fechaVLGuion}$end=${fechaVLGuion}&ubmitOptions.x=55&submitOptions.y=4&trans=N', abortando"
-		    rm $CARPETA_OUT/mstar_euro_dolar.html.tmp
+		rm $CARPETA_OUT/mstar_euro_dolar.html.tmp
         exit $?
       fi
 	  # Leemos el fichero descargado y lo obtenemos el valor
