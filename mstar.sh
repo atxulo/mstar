@@ -190,8 +190,8 @@ else
   # Eliminamos los saltos de linea tipo Windows o Mac del fichero .dat por si se ha editado manualmente
   # No usamos sed -i porque en MacOS da problemas: http://stackoverflow.com/questions/5694228/sed-in-place-flag-that-works-both-on-mac-bsd-and-linux
   # Asi que usamos esto
-  sed -e $'s/\r//' "$CARPETA_OUT/mstar_portfolio_$sufijo.dat" > "$CARPETA_OUT/mstar_portfolio_$sufijo.dat.tmp"
-  mv "$CARPETA_OUT/mstar_portfolio_$sufijo.dat.tmp" "$CARPETA_OUT/mstar_portfolio_$sufijo.dat"
+  # sed -e $'s/\r//' "$CARPETA_OUT/mstar_portfolio_$sufijo.dat" > "$CARPETA_OUT/mstar_portfolio_$sufijo.dat.tmp"
+  # mv "$CARPETA_OUT/mstar_portfolio_$sufijo.dat.tmp" "$CARPETA_OUT/mstar_portfolio_$sufijo.dat"
 fi
 
 if [ ! -f $CARPETA_OUT/mstar_isin_$sufijo.dat ]; then
