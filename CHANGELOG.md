@@ -1,10 +1,12 @@
-## 1.1.0-beta1 (25/03/2014)
+## 1.1.0 (??/03/2014)
 
 Correciones:
 
  - Cuando el ID del portolio es incorrecto, el script ya finaliza sin avisar al usuario (https://github.com/enekogb/mstar/issues/45)
  - Al descargar los fuentes de GitHub con el cliente Windows, ya no se modifican los saltos de linea de los scripts (https://github.com/enekogb/mstar/issues/46)
+ - Cuando la carterar de Morningstar tiene acciones, el script mstar ya no las ignora, sino que obtiene su VL como si fuese un fondo (https://github.com/enekogb/mstar/issues/50)
  - El script mstar_movimientos ya permite tener más de un movimiento en la misma fecha, siempre que no sean exactamente iguales.
+
 
 Cambios:
 
