@@ -1,4 +1,4 @@
-## 1.1.0 (??/03/2014)
+## 1.1.0 (27/03/2014)
 
 Correciones:
 
@@ -12,5 +12,6 @@ Cambios:
 
   - Añadido parametro -a para permitir cambiar de nombre a los ficheros generados (https://github.com/enekogb/mstar/issues/47)
   - Añadida verificación de que el login se ha hecho correctamente (https://github.com/enekogb/mstar/issues/36)
-  - Añadido nuevo script mstar_ftimes.sh para obtener los datos de ftimes.
+  - Añadido nuevo script mstar_ftimes.sh (windows/mstar_ftimes.bat) para obtener los datos de ftimes.
   - Añadido archivo windows/corregirSaltosLinea.bat para corregir saltos de linea después de la edición.
+  - Añadido archivo windows/mstar_consolidar.bat para eliminar registros de los ficheros dat y csv.
