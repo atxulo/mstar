@@ -13,3 +13,4 @@ Cambios:
   - Añadido parametro -a para permitir cambiar de nombre a los ficheros generados (https://github.com/enekogb/mstar/issues/47)
   - Añadida verificación de que el login se ha hecho correctamente (https://github.com/enekogb/mstar/issues/36)
   - Añadido nuevo script mstar_ftimes.sh para obtener los datos de ftimes.
+  - Añadido archivo windows/corregirSaltosLinea.bat para corregir saltos de linea después de la edición.
