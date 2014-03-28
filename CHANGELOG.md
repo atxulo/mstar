@@ -1,3 +1,9 @@
+## 1.1.1 (28/03/2014)
+
+Correciones:
+
+ - Cuando el VL es mayor que 1.000, el script mstar_ftimes ya convierte correctamente el separador de miles (https://github.com/enekogb/mstar/issues/53)
+
 ## 1.1.0 (27/03/2014)
 
 Correciones:
