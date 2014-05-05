@@ -229,8 +229,12 @@ else
   fi
 fi
 
-# Leemos el fichero descargado y lo convertimos en un fichero con este formato: "ID;Nombre;AAAAMMDD;Fecha;VL;MONEDA"
-cat $CARPETA_OUT/mstar_portfolio_$sufijo.html.tmp | gawk 'match( $0, /snapshot\.aspx\?id=([A-Za-z0-9]*)">([^<]*).*title="([^"/]*)\/([^/]*)\/([^"]*)[^>]*>([^<]*)/, grupos) { print grupos[1] ";" grupos[2] ";" grupos[5] grupos[4] grupos[3] ";" grupos[3] "/" grupos[4] "/" grupos[5] ";" grupos[6] ";EUR"}' > $CARPETA_OUT/mstar_portfolio_$sufijo.dat.tmp 
+# Leemos el fichero descargado y lo convertimos en un fichero con este formato: "URL;ID;Nombre;AAAAMMDD;Fecha;VL;MONEDA"
+if [[ "$CARTERA_RAPIDA" = true ]]; then 
+  cat $CARPETA_OUT/mstar_portfolio_$sufijo.html.tmp | gawk 'match( $0, /href="([^"]*(snapshot|default)\.aspx\?id=([A-Za-z0-9]*))">([^<]*).*title="([^"/]*)\/([^/]*)\/([^"]*)[^>]*>([^<]*)<.*msDataText[^>]*>([^<]*)/, grupos) { print grupos[1] ";" grupos[3] ";" grupos[4] ";" grupos[7] grupos[6] grupos[5] ";" grupos[5] "/" grupos[6] "/" grupos[7] ";" grupos[8] ";" grupos[9]}' > $CARPETA_OUT/mstar_portfolio_$sufijo.dat.tmp  
+else
+  cat $CARPETA_OUT/mstar_portfolio_$sufijo.html.tmp | gawk 'match( $0, /href="([^"]*(snapshot|default)\.aspx\?id=([A-Za-z0-9]*))">([^<]*).*title="([^"/]*)\/([^/]*)\/([^"]*)[^>]*>([^<]*)/, grupos) { print grupos[1] ";" grupos[3] ";" grupos[4] ";" grupos[7] grupos[6] grupos[5] ";" grupos[5] "/" grupos[6] "/" grupos[7] ";" grupos[8] ";EUR"}' > $CARPETA_OUT/mstar_portfolio_$sufijo.dat.tmp
+fi
 
 # Calculamos fechas auxiliares que se usan en el procesado
 hoy=$(date +"%Y%m%d")
@@ -238,7 +242,14 @@ pasadoAnyo=$(date -d "-1 year" +"%Y")
 
 # Leemos el fichero temporal descargado
 while read linea_dat_tmp; do
-	mstar_id=${linea_dat_tmp%%;*}  # Elimina el mayor ;* por el final
+	
+    # Cogemos la url eliminando todo a partir del primer ;
+	urlDetalleMstar=${linea_dat_tmp%%;*}
+	# Eliminamos la URL de la linea eliminando todo hasta el primer ; porque no la necesitamos mas
+	linea_dat_tmp=${linea_dat_tmp#*;}
+	# Cogemos el isin eliminando todo a partir del primer ;
+	mstar_id=${linea_dat_tmp%%;*}
+	
 	nombre=${linea_dat_tmp#*;}     # Elimina el menor *; por el principio
 	nombre=${nombre%%;*}           # Elimina el mayor ;* por el final
 
@@ -253,24 +264,29 @@ while read linea_dat_tmp; do
 		fi
 
 	else
-		wget --output-document=$CARPETA_OUT/mstar_$mstar_id.html.tmp "http://www.morningstar.es/es/funds/snapshot/snapshot.aspx?id=$mstar_id"
+		wget --output-document=$CARPETA_OUT/mstar_$mstar_id.html.tmp "http://www.morningstar.es$urlDetalleMstar"
 		
-		# Comprobamos si el fichero contiene el texto ISIN (es un fondo) o DGS (es un plan de pensiones)
+		# Comprobamos si el fichero contiene el texto ISIN (es un fondo), DGS (es un plan de pensiones) o tiene ISIN pero es una accion del IBEX
 		isin=$(cat "$CARPETA_OUT/mstar_$mstar_id.html.tmp" | sed -n -e 's/.*heading\">ISIN<\/td>.*text">\([^<]*\).*Patrimonio (.*/\1/p')
 		if [ ! -z "$isin" ]; then
 		  mensaje "Obtenido isin $isin para id $mstar_id"
 		else
-          isin=$(cat "$CARPETA_OUT/mstar_$mstar_id.html.tmp" | sed -n -e 's/.*DGS<\/div><div class=\"value_div text\">\([^<]*\)<\/div>.*/\1/p')
-          if [ ! -z "$isin" ]; then
+      isin=$(cat "$CARPETA_OUT/mstar_$mstar_id.html.tmp" | sed -n -e 's/.*DGS<\/div><div class=\"value_div text\">\([^<]*\)<\/div>.*/\1/p')
+      if [ ! -z "$isin" ]; then
 		    mensaje "Obtenido dgs $isin para id $mstar_id"
-	      fi
+      else
+        isin=$(cat "$CARPETA_OUT/mstar_$mstar_id.html.tmp" | sed -n -e 's/.*id=\"Col0Isin\">\([^<]*\)<\/td>.*/\1/p')
+        if [ ! -z "$isin" ]; then
+          mensaje "Obtenido isin (acciones) $isin para id $mstar_id"
+        fi
+      fi
 		fi
 		
 		if [ -z "$isin" ]; then
-		  echo "Error al obtener el ISIN o DGS para el fondo '$mstar_id' de la pagina de morningstar, abortando" 1>&2
+		  echo "Error al obtener el ISIN, DGS para el fondo '$mstar_id' de la pagina de morningstar, abortando" 1>&2
 		  rm "$CARPETA_OUT/mstar_$mstar_id.html.tmp"
-          exit 1
-        fi
+      exit 1
+    fi
 
 		rm "$CARPETA_OUT/mstar_$mstar_id.html.tmp"
 		# Escribimos el ISIN/DGS en el fichero
@@ -291,14 +307,24 @@ while read linea_dat_tmp; do
 	cat $CARPETA_OUT/mstar_ftimes_$isin.html.tmp | \
 	sed -e '/tableContainer/!d' -e 's/.*<tbody>//' -e 's/<\/tbody>.*//' -e 's/<tr>//g' -e 's/<td[^>]*>//g' -e 's/<\/td>/\;/g' -e 's/<\/tr>/\n/g' > $CARPETA_OUT/mstar_ftimes_$isin.csv.tmp
 
+  # Comprobamos el formato la pagina de Finantial Times
+  # Los fondos tienen 6 columnas de datos (incluyendo 1 extra al final), el VL esta en la 3: http://markets.ft.com/research/Tearsheets/PriceHistoryPopup?symbol=FR0010149120
+  # Las acciones tienen 8 columnas de datos (incluyendo 1 extra al final), el valor esta en la 6: http://markets.ft.com/research/Tearsheets/PriceHistoryPopup?symbol=ES0113900J37
+    num_columnas=$(awk -F\; 'NR==1{print NF}' $CARPETA_OUT/mstar_ftimes_$isin.csv.tmp)
+    if [[ $num_columnas = "6" ]]; then
+      columna_valor="3"
+    else
+      columna_valor="6"
+  fi;
+
 	# Leemos cada linea del CSV
-    while read linea_csv_tmp; do
+  while read linea_csv_tmp; do
 	
       linea_csv_tmp=$(trim "$linea_csv_tmp")
 	
       # Extraemos la fecha y el VL	
       fecha=$(echo $linea_csv_tmp | cut -d\; -f1,2 | sed -e 's/\;/ /g')
-      valor=$(echo $linea_csv_tmp | cut -d\; -f3 | sed -e 's/,/\./g' -e 's/\(.*\)\./\1,/')  # Reemplazamos las , por . y el ultimo . por ,
+      valor=$(echo $linea_csv_tmp | cut -d\; -f$columna_valor | sed -e 's/,/\./g' -e 's/\(.*\)\./\1,/')  # Reemplazamos las , por . y el ultimo . por ,
       
 	  # Si no hay valor, ignoramos la linea
 	  if [ ! -z "$valor" ]; then
@@ -327,8 +353,8 @@ while read linea_dat_tmp; do
     done <$CARPETA_OUT/mstar_ftimes_$isin.csv.tmp
 	
     # Borramos los ficheros temporales
-	rm $CARPETA_OUT/mstar_ftimes_$isin.html.tmp
-	rm $CARPETA_OUT/mstar_ftimes_$isin.csv.tmp
+	  rm $CARPETA_OUT/mstar_ftimes_$isin.html.tmp
+	  rm $CARPETA_OUT/mstar_ftimes_$isin.csv.tmp
 	
 	# Guardamos la linea modificada en el fichero
 done <$CARPETA_OUT/mstar_portfolio_$sufijo.dat.tmp > $CARPETA_OUT/mstar_portfolio_$sufijo.dat.tmp.2; mv $CARPETA_OUT/mstar_portfolio_$sufijo.dat.tmp{.2,}
