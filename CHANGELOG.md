@@ -1,6 +1,12 @@
-## 1.1.2 (15/05/2014)
+## 1.1.4 (05/05/2014)
 
-- Nueva plantilla mstar_portfolio_plantilla_2.xlsm
+Correcciones:
+
+  - El script mstar_ftimes ya no ignora las acciones, sino que obtiene el valor de cierre de la pagina de ftimes.
+
+## 1.1.2 (15/04/2014)
+
+  - Nueva plantilla mstar_portfolio_plantilla_2.xlsm
 
 ## 1.1.1 (28/03/2014)
 
