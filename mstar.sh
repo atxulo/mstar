@@ -296,12 +296,12 @@ while read linea_dat_tmp; do
 	if [[ "$moneda" = "EUR" ]]; then 
       # Como ya esta en euros, el cambio es 1
 	  cambioVL="1"
-	elif [[ "$moneda" = "USD" ]]; then
-	  # Descargamos el cambio euro-dolar del dia del vl
-	  wget --output-document=$CARPETA_OUT/mstar_euro_dolar.html.tmp "http://sdw.ecb.europa.eu/quickview.do?SERIES_KEY=120.EXR.D.USD.EUR.SP00.A&start=${fechaVLGuion}&end=${fechaVLGuion}&ubmitOptions.x=55&submitOptions.y=4&trans=N"
+	else
+	  # Descargamos el cambio euro-$moneda del dia del vl
+	  wget --output-document=$CARPETA_OUT/mstar_euro_$moneda.html.tmp "http://sdw.ecb.europa.eu/quickview.do?SERIES_KEY=120.EXR.D.$moneda.EUR.SP00.A&start=${fechaVLGuion}&end=${fechaVLGuion}&ubmitOptions.x=55&submitOptions.y=4&trans=N"
       if [ $? -ne 0 ]; then
-        echo "Error al descargar la informacion de 'http://sdw.ecb.europa.eu/quickview.do?SERIES_KEY=120.EXR.D.USD.EUR.SP00.A&start=${fechaVLGuion}$end=${fechaVLGuion}&ubmitOptions.x=55&submitOptions.y=4&trans=N', abortando"
-		rm $CARPETA_OUT/mstar_euro_dolar.html.tmp
+        echo "Error al descargar la informacion de 'http://sdw.ecb.europa.eu/quickview.do?SERIES_KEY=120.EXR.D.$moneda.EUR.SP00.A&start=${fechaVLGuion}$end=${fechaVLGuion}&ubmitOptions.x=55&submitOptions.y=4&trans=N', abortando"
+		rm $CARPETA_OUT/mstar_euro_$moneda.html.tmp
         exit $?
       fi
 	  # Leemos el fichero descargado y lo obtenemos el valor
@@ -310,11 +310,8 @@ while read linea_dat_tmp; do
       # Elimina las que no tengan 8%
       # Extrae el valor (#.####)
       # Elimina las lineas que no han podido ser formateada y aun tienen el 8%
-	  cambioVL=$(cat $CARPETA_OUT/mstar_euro_dolar.html.tmp | sed -e '1,/table class=\"tablestats\">/d' -e '/\/table/,$ d' -e '/8%/ !d' -e 's/.*8%[^>]*>[0-9]*-[0-9]*-[0-9]*<\/td\>.*right\;\">\([0-9]*\)\.\([0-9]*\).*/\1.\2/' -e '/8%/ d')
-	  rm $CARPETA_OUT/mstar_euro_dolar.html.tmp
-	else
-      # No sabemos que moneda es
-	  cambioVL="ERROR"
+	  cambioVL=$(cat $CARPETA_OUT/mstar_euro_$moneda.html.tmp | sed -e '1,/table class=\"tablestats\">/d' -e '/\/table/,$ d' -e '/8%/ !d' -e 's/.*8%[^>]*>[0-9]*-[0-9]*-[0-9]*<\/td\>.*right\;\">\([0-9]*\)\.\([0-9]*\).*/\1.\2/' -e '/8%/ d')
+	  rm $CARPETA_OUT/mstar_euro_$moneda.html.tmp
 	fi
 	
     # Hacemos el cambio y escribimos de nuevo los campos
