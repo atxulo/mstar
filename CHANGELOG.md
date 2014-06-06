@@ -1,3 +1,14 @@
+## 1.1.4 (06/06/2014)
+
+Cambios:
+
+  - Cuando la moneda del fondo no es EUR, ahora no falla si no es USD, sino que intenta localizar el cambio en la pagina del BCE. Esto funciona siempre que la moneda que muestra Morningstar tenga el mismo codigo que usa el BCE en sus enlaces (cambiando XXX por la moneda en cuestion): http://sdw.ecb.europa.eu/quickview.do?SERIES_KEY=120.EXR.D.XXX.EUR.SP00.A
+
+  Por ejemplo, funciona con dolares americanos (USD) y libras esterlinas (GBP):
+  
+  - http://sdw.ecb.europa.eu/quickview.do?SERIES_KEY=120.EXR.D.USD.EUR.SP00.A
+  - http://sdw.ecb.europa.eu/quickview.do?SERIES_KEY=120.EXR.D.GBP.EUR.SP00.A
+
 ## 1.1.3 (05/05/2014)
 
 Correcciones:
