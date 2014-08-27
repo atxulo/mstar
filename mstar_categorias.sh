@@ -153,7 +153,7 @@ mensaje_debug "$(cat $CARPETA_OUT/mstar_categorias.dat.tmp2)"
 mensaje_debug "---------- Fin filtrado campos ----------"
 
 # Eliminamos los td que quedan
-sed -ne 's/.*<td[^>]*>//p' "$CARPETA_OUT/mstar_categorias.dat.tmp2" > "$CARPETA_OUT/mstar_categorias.dat.tmp"
+sed -ne 's/<td[^>]*>//p' "$CARPETA_OUT/mstar_categorias.dat.tmp2" > "$CARPETA_OUT/mstar_categorias.dat.tmp"
 mensaje_debug "---------- Eliminacion td restantes ----------"
 mensaje_debug "$(cat $CARPETA_OUT/mstar_categorias.dat.tmp)"
 mensaje_debug "---------- Fin eliminacion td restantes ----------"
