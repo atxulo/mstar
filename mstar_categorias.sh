@@ -9,6 +9,7 @@ AHORA=$(date +"%Y%m%d_%H%M%S_%N")
 CARPETA_BACKUP=
 CARPETA_OUT="out"
 VERBOSE=false
+DEBUG=false
 
 # Funcion para copiar un fichero en una ruta de backup
 # $1 ruta del fichero del que hacer backup
@@ -27,6 +28,11 @@ mensaje() {
 	if [[ "$VERBOSE" = true ]]; then echo $1 1>&2; fi
 }
 
+# Funcion para escribir los mensajes en modo debug
+# $1 mensaje a escribir
+mensaje_debug() {
+  if [[ "$DEBUG" = true ]]; then echo "DEBUG: $1" 1>&2; fi
+}
 
 trim() {
     local var=$@
@@ -43,6 +49,7 @@ USO: $0 opciones
 
 OPCIONES:
    -b [ruta]       Path de la carpeta donde dejar una copia de seguridad de los ficheros. Si no se indica, no se hace copia.
+   -d              Modo debug para depurar con mas informacion que en modo verbose
    -h              Muestra este mensaje de ayuda y finaliza
    -o [ruta]       Path de la carpeta donde dejar los ficheros resultado. Si no existe, la intenta crear
    -v              Modo verbose para depurar los pasos ejecutados
@@ -54,11 +61,16 @@ EOF
 }
 
 # Leemos los parametros del script
-while getopts "b:ho:v" opt; do
+while getopts "b:dho:v" opt; do
   case $opt in
     b)
       CARPETA_BACKUP=$OPTARG
 	  ;;
+	  d)
+	    # Debug implica Verbose tambien
+	    DEBUG=true
+      VERBOSE=true
+      ;;
     h)
       usage
       exit 1
@@ -119,9 +131,55 @@ if [ $? -ne 0 ]; then
 fi
 
 # Leemos el fichero descargado y lo convertimos en un fichero con este formato: "ID;Nombre;YTD;Fecha"
-cat $CARPETA_OUT/mstar_categorias.html.tmp | grep CategoryOverviewTable | sed -e 's/<\/td>/\n/g' -e 's/<tbody>/<tbody>\n/g' | sed -ne '/gridCategoryName/p' -ne '/gridReturnM0/p' -ne '/gridTrailingDate/p' | sed -ne 's/.*<td[^>]*>//p' | sed -e 's/.*default\.aspx?category=\([^"]*\)" title="\([^"]*\)".*/\1\n\2/' | gawk 'ORS=NR%4?";":"\n"' | sed -e '/\;-$/d' > $CARPETA_OUT/mstar_categorias.dat.tmp 
+# Como es susceptible de fallar, lo hacemos paso a paso y así podemos depurar mas facil
+# No usamos sed -i porque en MacOS da problemas: http://stackoverflow.com/questions/5694228/sed-in-place-flag-that-works-both-on-mac-bsd-and-linux
 
-# Juntamos el fichero temporal con el dat, ordenando alfabeticamente (asc)  y por fecha (desc)
+# Buscamos la linea con CategoryOverviewTable
+grep -i CategoryOverviewTable "$CARPETA_OUT/mstar_categorias.html.tmp" > "$CARPETA_OUT/mstar_categorias.dat.tmp2"
+mensaje_debug "---------- Linea CategoryOverviewTable ----------"
+mensaje_debug "$(cat $CARPETA_OUT/mstar_categorias.dat.tmp2)"
+mensaje_debug "---------- Fin linea CategoryOverviewTable ----------"
+
+# Cambiamos los /td y el tbody por saltos de linea para tener cada campo en una linea 
+sed -e 's/<\/td>/\n/g' -e 's/<tbody>/<tbody>\n/g' "$CARPETA_OUT/mstar_categorias.dat.tmp2" > "$CARPETA_OUT/mstar_categorias.dat.tmp" 
+mensaje_debug "---------- Separado en lineas ----------"
+mensaje_debug "$(cat $CARPETA_OUT/mstar_categorias.dat.tmp)"
+mensaje_debug "---------- Fin separado en lineas ----------"
+
+# Eliminamos los campos que no interesan
+sed -ne '/gridCategoryName/p' -ne '/gridReturnM0/p' -ne '/gridTrailingDate/p' "$CARPETA_OUT/mstar_categorias.dat.tmp" > "$CARPETA_OUT/mstar_categorias.dat.tmp2"
+mensaje_debug "---------- Filtrado campos ----------"
+mensaje_debug "$(cat $CARPETA_OUT/mstar_categorias.dat.tmp2)"
+mensaje_debug "---------- Fin filtrado campos ----------"
+
+# Eliminamos los td que quedan
+sed -ne 's/.*<td[^>]*>//p' "$CARPETA_OUT/mstar_categorias.dat.tmp2" > "$CARPETA_OUT/mstar_categorias.dat.tmp"
+mensaje_debug "---------- Eliminacion td restantes ----------"
+mensaje_debug "$(cat $CARPETA_OUT/mstar_categorias.dat.tmp)"
+mensaje_debug "---------- Fin eliminacion td restantes ----------"
+
+# Obtenemos el titulo y el ID del enlace
+sed -e 's/.*default\.aspx?category=\([^"]*\)" title="\([^"]*\)".*/\1\n\2/' "$CARPETA_OUT/mstar_categorias.dat.tmp" > "$CARPETA_OUT/mstar_categorias.dat.tmp2"
+mensaje_debug "---------- Obtencion de campos del enlace ----------"
+mensaje_debug "$(cat $CARPETA_OUT/mstar_categorias.dat.tmp2)"
+mensaje_debug "---------- Fin obtencion de campos del enlace ----------"
+
+# Pintamos los campos separados por ; cada 4 campos
+gawk 'ORS=NR%4?";":"\n"' "$CARPETA_OUT/mstar_categorias.dat.tmp2" > "$CARPETA_OUT/mstar_categorias.dat.tmp"
+mensaje_debug "---------- Agrupacion de campos ----------"
+mensaje_debug "$(cat $CARPETA_OUT/mstar_categorias.dat.tmp)"
+mensaje_debug "---------- Fin agrupacion de campos ----------"
+
+# Quitamos las lineas que tienen un - al final porque no tienen valor
+sed -e '/\;-$/d' "$CARPETA_OUT/mstar_categorias.dat.tmp" > "$CARPETA_OUT/mstar_categorias.dat.tmp2" 
+mensaje_debug "---------- Borrado lineas sin valor ----------"
+mensaje_debug "$(cat $CARPETA_OUT/mstar_categorias.dat.tmp2)"
+mensaje_debug "---------- Fin borrado lineas sin valor ----------"
+
+# Movemos el fichero temporal auxiliar 
+mv -f $CARPETA_OUT/mstar_categorias.dat.tmp2 $CARPETA_OUT/mstar_categorias.dat.tmp
+
+# Juntamos el fichero temporal con el dat, ordenando alfabeticamente (asc) y por fecha (desc)
 cat $CARPETA_OUT/mstar_categorias.dat $CARPETA_OUT/mstar_categorias.dat.tmp | sort -u -t\; -k2,2r -k4,4 -o $CARPETA_OUT/mstar_categorias.dat
 
 # Si ya existe el CSV, hacemos el backup si asi se ha indicado 
