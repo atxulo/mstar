@@ -1,5 +1,9 @@
 language: bash
 
+os:
+  - linux
+  - osx
+
 before_script:
  - chmod +x -R test/*.sh
  
