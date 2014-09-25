@@ -1,5 +1,10 @@
 language: bash
 
+env:
+  global:
+    - secure: "gk1O6Q7CvP9915ZCkl4WoSIfDEijXaCOLCHx2PixOwlrz3yEftJyzJnWpjYXllGOJet/Gj5NAnAQxO3ASK0eViM8z3MQjFYlnb/o+K4agPdii1JVtUiopfAWDugx1Rr0xaAawm8xqENzzRTdkj63kNR4HSgCdUUOOExtqLmG3nI="
+    - secure: "Mp+/UhXohqLj8k3UfA0ihUxKLQ932kUxFgpuHMaffa9K+R04Yz6x7zGDelz32YFW0YygEPyY0blkbbkkkxUZFIFCkdMpFwx8ZH30VL1fURZkBGU0Cbtbf8W0sHXjVtN2s5iRqYHXZuTxe8gKIIRipsQXHdQtm0pkEsQoJfTEZNQ="
+
 os:
   - linux
 #  - osx
