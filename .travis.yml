@@ -5,9 +5,9 @@ os:
   - osx
 
 before_script:
- - chmod +x -R test/*.sh
+  - chmod +x -R test/*.sh
  
- before_install:
+before_install:
   - brew update
   - if brew outdated | grep -qx wget; then brew upgrade wget; fi
   - if brew outdated | grep -qx gawk; then brew upgrade gawk; fi
